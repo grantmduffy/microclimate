@@ -1020,26 +1020,26 @@ function init(){
     }
     
     // compile shaders
-    let sim_vs = compile_shader(common_src + sim_vs_src, gl.VERTEX_SHADER, '');
-    let sim_fs = compile_shader(common_src + sim_fs_src, gl.FRAGMENT_SHADER, '');
+    let sim_vs = compile_shader(common_src + sim_vs_src, gl.VERTEX_SHADER);
+    let sim_fs = compile_shader(common_src + sim_fs_src, gl.FRAGMENT_SHADER);
     let sim_program = link_program(sim_vs, sim_fs);
-    let render2d_vs = compile_shader(common_src + render2d_vs_src, gl.VERTEX_SHADER, '');
-    let render2d_fs = compile_shader(common_src + render2d_fs_src, gl.FRAGMENT_SHADER, '');
+    let render2d_vs = compile_shader(common_src + render2d_vs_src, gl.VERTEX_SHADER);
+    let render2d_fs = compile_shader(common_src + render2d_fs_src, gl.FRAGMENT_SHADER);
     let render2d_program = link_program(render2d_vs, render2d_fs);
-    let arrow_vs = compile_shader(common_src + arrow_vs_src, gl.VERTEX_SHADER, '');
-    let arrow_fs = compile_shader(common_src + arrow_fs_src, gl.FRAGMENT_SHADER, '');
+    let arrow_vs = compile_shader(common_src + arrow_vs_src, gl.VERTEX_SHADER);
+    let arrow_fs = compile_shader(common_src + arrow_fs_src, gl.FRAGMENT_SHADER);
     let arrow_program = link_program(arrow_vs, arrow_fs);
-    let render3d_vs = compile_shader(common_src + render3d_vs_src, gl.VERTEX_SHADER, '');
-    let render3d_fs = compile_shader(common_src + render2d_fs_src, gl.FRAGMENT_SHADER, '');
+    let render3d_vs = compile_shader(common_src + render3d_vs_src, gl.VERTEX_SHADER);
+    let render3d_fs = compile_shader(common_src + render2d_fs_src, gl.FRAGMENT_SHADER);
     let render3d_program = link_program(render3d_vs, render3d_fs);
-    let water_vs = compile_shader(common_src + water_vs_src, gl.VERTEX_SHADER, '');
-    let water_fs = compile_shader(common_src + water_fs_src, gl.FRAGMENT_SHADER, '');
+    let water_vs = compile_shader(common_src + water_vs_src, gl.VERTEX_SHADER);
+    let water_fs = compile_shader(common_src + water_fs_src, gl.FRAGMENT_SHADER);
     let water_program = link_program(water_vs, water_fs);
-    let cloud_plane_vs = compile_shader(common_src + cloud_plane_vs_src, gl.VERTEX_SHADER, '');
-    let cloud_plane_fs = compile_shader(common_src + cloud_plane_fs_src, gl.FRAGMENT_SHADER, '');
+    let cloud_plane_vs = compile_shader(common_src + cloud_plane_vs_src, gl.VERTEX_SHADER);
+    let cloud_plane_fs = compile_shader(common_src + cloud_plane_fs_src, gl.FRAGMENT_SHADER);
     let cloud_plane_program = link_program(cloud_plane_vs, cloud_plane_fs);
-    let sun_vs = compile_shader(common_src + sun_vs_src, gl.VERTEX_SHADER, '');
-    let sun_fs = compile_shader(common_src + sun_fs_src, gl.FRAGMENT_SHADER, '');
+    let sun_vs = compile_shader(common_src + sun_vs_src, gl.VERTEX_SHADER);
+    let sun_fs = compile_shader(common_src + sun_fs_src, gl.FRAGMENT_SHADER);
     let sun_program = link_program(sun_vs, sun_fs);
 
     // setup buffers

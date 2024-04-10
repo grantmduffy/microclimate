@@ -1,11 +1,3 @@
-// TODO: move to webgl2
-var global_glsl = `#version 300 es
-precision highp float;
-precision highp int;
-precision highp sampler2D;
-out vec4 frag_color;
-`;
-
 var gl = null;
 var layers = [];
 var uniforms = {};
@@ -62,9 +54,44 @@ function setup_gl(canvas, cull=null, depth_test=true){
 }
 
 
-function compile_shader(source, type, globals=global_glsl){
+function load_file(path){
+    return new Promise((resolve, reject) => {
+        let r = new XMLHttpRequest();
+        r.open('GET', path, true);
+        r.onload = function(){
+            if (r.status == 200){
+                resolve(r.responseText);
+            } else {
+                reject(new Error('failed. status: ' + r.status));
+            }
+        };
+        r.onerror = function(){
+            reject(new Error('failed. onerror'));
+        };
+        r.send();
+    });
+}
+
+
+function compile_program(vs_src_path, fs_src_path, global_src_path){
+    return new Promise((resolve, reject) =>{
+        Promise.all([
+            load_file(global_src_path),
+            load_file(vs_src_path),
+            load_file(fs_src_path)
+        ]).then((args) => {
+            [global_src, vs_src, fs_src] = args;
+            let vs = compile_shader(global_src + vs_src, gl.VERTEX_SHADER);
+            let fs = compile_shader(global_src + fs_src, gl.FRAGMENT_SHADER);
+            resolve(link_program(vs, fs));
+        });
+    });
+}
+
+
+function compile_shader(source, type){
     let shader = gl.createShader(type);
-    gl.shaderSource(shader, globals + source);
+    gl.shaderSource(shader, source);
     gl.compileShader(shader);
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)){
         console.error('Failed to compile shader:', gl.getShaderInfoLog(shader));
