@@ -569,6 +569,7 @@ void main(){
 `;
 
 let water_fs_src = `
+
 uniform vec2 sim_res;
 uniform sampler2D other_t;
 uniform vec3 sun_dir;
