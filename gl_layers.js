@@ -53,7 +53,6 @@ function setup_gl(canvas, cull=null, depth_test=true){
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 }
 
-
 function load_file(path){
     return new Promise((resolve, reject) => {
         let r = new XMLHttpRequest();
@@ -72,30 +71,35 @@ function load_file(path){
     });
 }
 
-
-function compile_program(vs_src_path, fs_src_path, global_src_path){
+function compile_program(vs_src_path, fs_src_path, global_src_path = 'glsl/global.glsl'){
     return new Promise((resolve, reject) =>{
         Promise.all([
             load_file(global_src_path),
             load_file(vs_src_path),
             load_file(fs_src_path)
         ]).then((args) => {
-            [global_src, vs_src, fs_src] = args;
-            let vs = compile_shader(global_src + vs_src, gl.VERTEX_SHADER);
-            let fs = compile_shader(global_src + fs_src, gl.FRAGMENT_SHADER);
-            resolve(link_program(vs, fs));
+            try {
+                [global_src, vs_src, fs_src] = args;
+                // console.log('#version 300 es\n' + global_src + vs_src);
+                let vs = compile_shader('#version 300 es\n' + global_src + vs_src, gl.VERTEX_SHADER);
+                // console.log('#version 300 es\n' + global_src + fs_src);
+                let fs = compile_shader('#version 300 es\n' + global_src + fs_src, gl.FRAGMENT_SHADER);
+                let p = link_program(vs, fs);
+                console.log(p);
+                resolve(p);    
+            } catch(err) {
+                reject(err);
+            }
         });
     });
 }
-
 
 function compile_shader(source, type){
     let shader = gl.createShader(type);
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)){
-        console.error('Failed to compile shader:', gl.getShaderInfoLog(shader));
-        throw new Error('Failed to compile shader');
+        throw new Error(print_error(source, gl.getShaderInfoLog(shader)));
     }
     return shader;
 }
@@ -115,6 +119,18 @@ function link_program(vertex_shader, fragment_shader){
         return;
     }
     return program;
+}
+
+function print_error(source, err){
+    let errs = err.slice(0, -2).split('\n');
+    let lines = source.split('\n');
+    let out = '\n\n';
+    for (let i_err = 0; i_err < errs.length; i_err++){
+        let [_, char_start, line_num, glsl_err] = errs[i_err].match(/ERROR: ([0-9]+):([0-9]+): (.+)/);
+        [char_start, line_num] = [parseInt(char_start), parseInt(line_num)];
+        out += `GLSL Error ${i_err}: ${glsl_err}\n${line_num - 1}: ${lines[line_num - 2].trimEnd()}\n${line_num}:*${lines[line_num - 1].trimEnd()}\n${line_num + 1}: ${lines[line_num].trimEnd()}\n`
+    }
+    return out;
 }
 
 function create_buffer(data, type, draw_type){
