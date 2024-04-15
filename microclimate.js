@@ -263,39 +263,72 @@ function init(){
     }
     
     // compile shaders
-    compile_program('glsl/sim_vs.glsl', 'glsl/sim_fs.glsl').then(
-        (program) => {programs['sim'] = program;});
-    compile_program('glsl/render2d_vs.glsl', 'glsl/render2d_fs.glsl').then(
-        (program) => {programs['render2d'] = program;});
-    compile_program('glsl/arrow_vs.glsl', 'glsl/arrow_fs.glsl').then(
-        (program) => {programs['arrow'] = program;});
-    compile_program('glsl/render3d_vs.glsl', 'glsl/render2d_fs.glsl').then(
-        (program) => {programs['render3d'] = program;});
-    compile_program('glsl/water_vs.glsl', 'glsl/water_fs.glsl').then(
-        (program) => {programs['water'] = program;});
-    compile_program('glsl/cloud_plane_vs.glsl', 'glsl/cloud_plane_fs.glsl').then(
-        (program) => {programs['cloud_plane'] = program;});
-    compile_program('glsl/sun_vs.glsl', 'glsl/sun_fs.glsl').then(
-        (program) => {programs['sun'] = program;});
+    compile_program('glsl/sim_vs.glsl', 'glsl/sim_fs.glsl').then((program) => {
+        let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+        gl.enableVertexAttribArray(pos_attr_loc);    
+        programs['sim'] = {
+            program: program,
+            pos_attr_loc: pos_attr_loc
+        };
+    });
+    compile_program('glsl/render2d_vs.glsl', 'glsl/render2d_fs.glsl').then((program) => {
+        let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+        gl.enableVertexAttribArray(pos_attr_loc);
+        programs['render2d'] = {
+            program: program,
+            pos_attr_loc: pos_attr_loc
+        };
+    });
+    compile_program('glsl/arrow_vs.glsl', 'glsl/arrow_fs.glsl').then((program) => {
+        let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+        gl.enableVertexAttribArray(pos_attr_loc);
+        programs['arrow'] = {
+            program: program,
+            pos_attr_loc: pos_attr_loc
+        };
+    });
+    compile_program('glsl/render3d_vs.glsl', 'glsl/render2d_fs.glsl').then((program) => {
+        let mesh_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+        gl.enableVertexAttribArray(mesh_attr_loc);
+        programs['render3d'] = {
+            program: program,
+            pos_attr_loc: mesh_attr_loc
+        };
+    });
+    compile_program('glsl/water_vs.glsl', 'glsl/water_fs.glsl').then((program) => {
+        let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+        gl.enableVertexAttribArray(pos_attr_loc);
+        programs['water'] = {
+            program: program,
+            pos_attr_loc: pos_attr_loc
+        };
+    });
+    compile_program('glsl/cloud_plane_vs.glsl', 'glsl/cloud_plane_fs.glsl').then((program) => {
+        let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+        gl.enableVertexAttribArray(pos_attr_loc);
+        programs['cloud_plane'] = {
+            program: program,
+            pos_attr_loc: pos_attr_loc
+        };
+    });
+    compile_program('glsl/sun_vs.glsl', 'glsl/sun_fs.glsl').then((program) => {
+        let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+        gl.enableVertexAttribArray(pos_attr_loc);
+        programs['sun'] = {
+            program: program,
+            pos_attr_loc: pos_attr_loc
+        };
+    });
 
     // setup buffers
     let vertex_buffer = create_buffer(new Float32Array(screen_mesh[0].flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
     let tri_buffer = create_buffer(new Uint16Array(screen_mesh[1].flat()), gl.ELEMENT_ARRAY_BUFFER, gl.STATIC_DRAW);
-    let sim_pos_attr_loc = gl.getAttribLocation(programs['sim'], 'vert_pos');
-    gl.enableVertexAttribArray(sim_pos_attr_loc);
-    let render2d_pos_attr_loc = gl.getAttribLocation(programs['render2d'], 'vert_pos');
-    gl.enableVertexAttribArray(render2d_pos_attr_loc);
     arrows = get_arrows(50);
     let arrow_buffer = create_buffer(new Float32Array(arrows.flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
-    let arrow_pos_attr_loc = gl.getAttribLocation(programs['arrow'], 'vert_pos');
-    gl.enableVertexAttribArray(arrow_pos_attr_loc);
     grid_mesh = get_grid_mesh(sim_res, sim_res);
     let grid_mesh_buffer = create_buffer(new Float32Array(grid_mesh.flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
-    let grid_mesh_attr_loc = gl.getAttribLocation(programs['render3d'], 'vert_pos');  // TODO: for other programs that use grid
     cloud_planes = get_cloud_planes(n_cloud_planes);
     let cloud_planes_buffer = create_buffer(new Float32Array(cloud_planes.flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
-    let cloud_plane_pos_attr_loc = gl.getAttribLocation(programs['cloud_plane'], 'vert_pos');
-
 
     // textures
     let sim_fbo = gl.createFramebuffer();
@@ -353,13 +386,13 @@ function init(){
         gl.disable(gl.BLEND);
         gl.enable(gl.DEPTH_TEST);
         // sim program
-        gl.useProgram(programs['sim']);
+        gl.useProgram(programs.sim);
         gl.viewport(0, 0, sim_res, sim_res);
         gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, tri_buffer);
         gl.bindFramebuffer(gl.FRAMEBUFFER, sim_fbo);
         gl.vertexAttribPointer(
-            render2d_pos_attr_loc, 2,
+            programs.render2d.pos_attr_loc, 2,
             gl.FLOAT, gl.FALSE,
             2 * 4, 0
         );
@@ -384,17 +417,17 @@ function init(){
         }
         
         // set uniforms
-        gl.uniform2f(gl.getUniformLocation(programs['sim'], 'mouse_pos'), mouse_state.x, mouse_state.y);
-        gl.uniform2f(gl.getUniformLocation(programs['sim'], 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
-        gl.uniform1i(gl.getUniformLocation(programs['sim'], 'mouse_btns'), mouse_state.buttons);
-        gl.uniform1i(gl.getUniformLocation(programs['sim'], 'keys'), mouse_state.keys);
-        gl.uniform2f(gl.getUniformLocation(programs['sim'], 'sim_res'), sim_res, sim_res);
-        gl.uniform1i(gl.getUniformLocation(programs['sim'], 'pen_type'), pen_type_options.indexOf(pen_type_el.value));
-        gl.uniform1f(gl.getUniformLocation(programs['sim'], 'pen_size'), document.getElementById('pen-size').value);
-        gl.uniform1f(gl.getUniformLocation(programs['sim'], 'pen_strength'), document.getElementById('pen-strength').value);
-        gl.uniform2f(gl.getUniformLocation(programs['sim'], 'pen_vel'), mouse_state.physical_vel_x, mouse_state.physical_vel_y);
-        gl.uniform1i(gl.getUniformLocation(programs['sim'], 'light_t'), 6);
-        gl.uniformMatrix4fv(gl.getUniformLocation(programs['sim'], 'M_sun'), gl.FALSE, M_sun);
+        gl.uniform2f(gl.getUniformLocation(programs.sim.program, 'mouse_pos'), mouse_state.x, mouse_state.y);
+        gl.uniform2f(gl.getUniformLocation(programs.sim.program, 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
+        gl.uniform1i(gl.getUniformLocation(programs.sim.program, 'mouse_btns'), mouse_state.buttons);
+        gl.uniform1i(gl.getUniformLocation(programs.sim.program, 'keys'), mouse_state.keys);
+        gl.uniform2f(gl.getUniformLocation(programs.sim.program, 'sim_res'), sim_res, sim_res);
+        gl.uniform1i(gl.getUniformLocation(programs.sim.program, 'pen_type'), pen_type_options.indexOf(pen_type_el.value));
+        gl.uniform1f(gl.getUniformLocation(programs.sim.program, 'pen_size'), document.getElementById('pen-size').value);
+        gl.uniform1f(gl.getUniformLocation(programs.sim.program, 'pen_strength'), document.getElementById('pen-strength').value);
+        gl.uniform2f(gl.getUniformLocation(programs.sim.program, 'pen_vel'), mouse_state.physical_vel_x, mouse_state.physical_vel_y);
+        gl.uniform1i(gl.getUniformLocation(programs.sim.program, 'light_t'), 6);
+        gl.uniformMatrix4fv(gl.getUniformLocation(programs.sim.program, 'M_sun'), gl.FALSE, M_sun);
         
         // draw
         gl.clearColor(0, 0, 0, 0);
@@ -408,12 +441,12 @@ function init(){
         canvas.width = sim_res;
         canvas.height = sim_res;
 
-        gl.useProgram(programs['sun']);
+        gl.useProgram(programs.sun.program);
         for (var i = 0; i < textures.length; i++){
             gl.uniform1i(gl.getUniformLocation(sun_program, textures[i].name), i);
         }
-        gl.uniformMatrix4fv(gl.getUniformLocation(programs['sun'], 'M_sun'), gl.FALSE, M_sun);
-        gl.uniform3fv(gl.getUniformLocation(programs['sun'], 'sun_dir'), sun_dir)
+        gl.uniformMatrix4fv(gl.getUniformLocation(programs.sun.program, 'M_sun'), gl.FALSE, M_sun);
+        gl.uniform3fv(gl.getUniformLocation(programs.sun.program, 'sun_dir'), sun_dir)
         if (render_mode_el.value != 'sun'){
             gl.bindFramebuffer(gl.FRAMEBUFFER, sun_fbo);
         } else {
@@ -436,36 +469,36 @@ function init(){
             canvas.height = sim_res;
             
             // draw render2d
-            gl.useProgram(programs['render2d']);
+            gl.useProgram(programs.render2d.program);
             for (var i = 0; i < textures.length; i++){
                 gl.uniform1i(gl.getUniformLocation(render2d_program, textures[i].name), i);
             }
-            gl.uniform2f(gl.getUniformLocation(programs['render2d'], 'sim_res'), sim_res, sim_res);
-            gl.uniform1i(gl.getUniformLocation(programs['render2d'], 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
-            gl.uniform1f(gl.getUniformLocation(programs['render2d'], 'pen_size'), document.getElementById('pen-size').value);
-            gl.uniform2f(gl.getUniformLocation(programs['render2d'], 'mouse_pos'), mouse_state.x, mouse_state.y);
-            gl.uniform2f(gl.getUniformLocation(programs['render2d'], 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
-            gl.uniform1i(gl.getUniformLocation(programs['render2d'], 'mouse_btns'), mouse_state.buttons);
-            gl.uniform2f(gl.getUniformLocation(programs['render2d'], 'sim_res'), sim_res, sim_res);
-            gl.uniform3fv(gl.getUniformLocation(programs['render2d'], 'sun_dir'), sun_dir)
-            gl.uniform1i(gl.getUniformLocation(programs['render2d'], 'light_t'), 6);
-            gl.uniformMatrix4fv(gl.getUniformLocation(programs['render2d'], 'M_sun'), gl.FALSE, M_sun);
+            gl.uniform2f(gl.getUniformLocation(programs.render2d.program, 'sim_res'), sim_res, sim_res);
+            gl.uniform1i(gl.getUniformLocation(programs.render2d.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
+            gl.uniform1f(gl.getUniformLocation(programs.render2d.program, 'pen_size'), document.getElementById('pen-size').value);
+            gl.uniform2f(gl.getUniformLocation(programs.render2d.program, 'mouse_pos'), mouse_state.x, mouse_state.y);
+            gl.uniform2f(gl.getUniformLocation(programs.render2d.program, 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
+            gl.uniform1i(gl.getUniformLocation(programs.render2d.program, 'mouse_btns'), mouse_state.buttons);
+            gl.uniform2f(gl.getUniformLocation(programs.render2d.program, 'sim_res'), sim_res, sim_res);
+            gl.uniform3fv(gl.getUniformLocation(programs.render2d.program, 'sun_dir'), sun_dir)
+            gl.uniform1i(gl.getUniformLocation(programs.render2d.program, 'light_t'), 6);
+            gl.uniformMatrix4fv(gl.getUniformLocation(programs.render2d.program, 'M_sun'), gl.FALSE, M_sun);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             gl.clearColor(0, 0, 0, 1);
             gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
             gl.drawElements(gl.TRIANGLES, 3 * screen_mesh[1].length, gl.UNSIGNED_SHORT, 0);
 
             // draw arrows
-            gl.useProgram(programs['arrow']);
+            gl.useProgram(programs.arrow.program);
             gl.bindBuffer(gl.ARRAY_BUFFER, arrow_buffer);
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
             gl.vertexAttribPointer(
-                arrow_pos_attr_loc, 3,
+                programs.arrow.pos_attr_loc, 3,
                 gl.FLOAT, gl.FALSE,
                 3 * 4, 0
             );
             for (var i = 0; i < textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(programs['arrow'], textures[i].name), i);
+                gl.uniform1i(gl.getUniformLocation(programs.arrow.program, textures[i].name), i);
             }
             gl.drawArrays(gl.LINES, 0, arrows.length * 2);
         } else if (render_mode_el.value == '3d'){
@@ -493,76 +526,76 @@ function init(){
                 gl.FLOAT, gl.FALSE,
                 2 * 4, 0
             );
-            gl.uniform2f(gl.getUniformLocation(programs['render3d'], 'sim_res'), sim_res, sim_res);
-            gl.uniform1i(gl.getUniformLocation(programs['render3d'], 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
-            gl.uniform1f(gl.getUniformLocation(programs['render3d'], 'pen_size'), document.getElementById('pen-size').value);
-            gl.uniform2f(gl.getUniformLocation(programs['render3d'], 'mouse_pos'), mouse_state.x, mouse_state.y);
-            gl.uniform2f(gl.getUniformLocation(programs['render3d'], 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
-            gl.uniform1i(gl.getUniformLocation(programs['render3d'], 'mouse_btns'), mouse_state.buttons);
-            gl.uniformMatrix4fv(gl.getUniformLocation(programs['render3d'], 'M_camera'), gl.FALSE, M_camera);
-            gl.uniform2f(gl.getUniformLocation(programs['render3d'], 'sim_res'), sim_res, sim_res);
-            gl.uniform3fv(gl.getUniformLocation(programs['render3d'], 'sun_dir'), sun_dir)
-            gl.uniform1i(gl.getUniformLocation(programs['render3d'], 'light_t'), 6);
-            gl.uniformMatrix4fv(gl.getUniformLocation(programs['render3d'], 'M_sun'), gl.FALSE, M_sun);
-            gl.uniform3f(gl.getUniformLocation(programs['render3d'], 'camera_pos'), camera_pos[0], camera_pos[1], camera_pos[2]);
+            gl.uniform2f(gl.getUniformLocation(programs.render3d.program, 'sim_res'), sim_res, sim_res);
+            gl.uniform1i(gl.getUniformLocation(programs.render3d.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
+            gl.uniform1f(gl.getUniformLocation(programs.render3d.program, 'pen_size'), document.getElementById('pen-size').value);
+            gl.uniform2f(gl.getUniformLocation(programs.render3d.program, 'mouse_pos'), mouse_state.x, mouse_state.y);
+            gl.uniform2f(gl.getUniformLocation(programs.render3d.program, 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
+            gl.uniform1i(gl.getUniformLocation(programs.render3d.program, 'mouse_btns'), mouse_state.buttons);
+            gl.uniformMatrix4fv(gl.getUniformLocation(programs.render3d.program, 'M_camera'), gl.FALSE, M_camera);
+            gl.uniform2f(gl.getUniformLocation(programs.render3d.program, 'sim_res'), sim_res, sim_res);
+            gl.uniform3fv(gl.getUniformLocation(programs.render3d.program, 'sun_dir'), sun_dir)
+            gl.uniform1i(gl.getUniformLocation(programs.render3d.program, 'light_t'), 6);
+            gl.uniformMatrix4fv(gl.getUniformLocation(programs.render3d.program, 'M_sun'), gl.FALSE, M_sun);
+            gl.uniform3f(gl.getUniformLocation(programs.render3d.program, 'camera_pos'), camera_pos[0], camera_pos[1], camera_pos[2]);
             for (var i = 0; i < textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(programs['render3d'], textures[i].name), i);
+                gl.uniform1i(gl.getUniformLocation(programs.render3d.program, textures[i].name), i);
             }
             gl.clearColor(191/255, 240/255, 1, 1);
             gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
             gl.drawArrays(gl.TRIANGLES, 0, grid_mesh.length * 3);
 
             // draw water
-            gl.useProgram(programs['water']);
+            gl.useProgram(programs.water.program);
             gl.enable(gl.BLEND);
-            gl.uniform2f(gl.getUniformLocation(programs['water'], 'sim_res'), sim_res, sim_res);
-            gl.uniform1i(gl.getUniformLocation(programs['water'], 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
-            gl.uniform1f(gl.getUniformLocation(programs['water'], 'pen_size'), document.getElementById('pen-size').value);
-            gl.uniform2f(gl.getUniformLocation(programs['water'], 'mouse_pos'), mouse_state.x, mouse_state.y);
-            gl.uniform2f(gl.getUniformLocation(programs['water'], 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
-            gl.uniform1i(gl.getUniformLocation(programs['water'], 'mouse_btns'), mouse_state.buttons);
-            gl.uniformMatrix4fv(gl.getUniformLocation(programs['water'], 'M_camera'), gl.FALSE, M_camera);
-            gl.uniform2f(gl.getUniformLocation(programs['water'], 'sim_res'), sim_res, sim_res);
-            gl.uniform3fv(gl.getUniformLocation(programs['water'], 'sun_dir'), sun_dir)
-            gl.uniform1i(gl.getUniformLocation(programs['water'], 'light_t'), 6);
-            gl.uniformMatrix4fv(gl.getUniformLocation(programs['water'], 'M_sun'), gl.FALSE, M_sun);
-            gl.uniform3f(gl.getUniformLocation(programs['water'], 'camera_pos'), camera_pos[0], camera_pos[1], camera_pos[2]);
+            gl.uniform2f(gl.getUniformLocation(programs.water.program, 'sim_res'), sim_res, sim_res);
+            gl.uniform1i(gl.getUniformLocation(programs.water.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
+            gl.uniform1f(gl.getUniformLocation(programs.water.program, 'pen_size'), document.getElementById('pen-size').value);
+            gl.uniform2f(gl.getUniformLocation(programs.water.program, 'mouse_pos'), mouse_state.x, mouse_state.y);
+            gl.uniform2f(gl.getUniformLocation(programs.water.program, 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
+            gl.uniform1i(gl.getUniformLocation(programs.water.program, 'mouse_btns'), mouse_state.buttons);
+            gl.uniformMatrix4fv(gl.getUniformLocation(programs.water.program, 'M_camera'), gl.FALSE, M_camera);
+            gl.uniform2f(gl.getUniformLocation(programs.water.program, 'sim_res'), sim_res, sim_res);
+            gl.uniform3fv(gl.getUniformLocation(programs.water.program, 'sun_dir'), sun_dir)
+            gl.uniform1i(gl.getUniformLocation(programs.water.program, 'light_t'), 6);
+            gl.uniformMatrix4fv(gl.getUniformLocation(programs.water.program, 'M_sun'), gl.FALSE, M_sun);
+            gl.uniform3f(gl.getUniformLocation(programs.water.program, 'camera_pos'), camera_pos[0], camera_pos[1], camera_pos[2]);
             for (var i = 0; i < textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(programs['water'], textures[i].name), i);
+                gl.uniform1i(gl.getUniformLocation(programs.water.program, textures[i].name), i);
             }
             gl.drawArrays(gl.TRIANGLES, 0, grid_mesh.length * 3);
 
 
             // draw plane clouds
-            gl.useProgram(programs['cloud_plane']);
+            gl.useProgram(programs.cloud.program);
             // gl.disable(gl.DEPTH_TEST);
             gl.bindBuffer(gl.ARRAY_BUFFER, cloud_planes_buffer);
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
             gl.vertexAttribPointer(
-                cloud_plane_pos_attr_loc, 3,
+                programs.cloud.pos_attr_loc, 3,
                 gl.FLOAT, gl.FALSE,
                 3 * 4, 0
             );
-            gl.uniform2f(gl.getUniformLocation(programs['cloud_plane'], 'sim_res'), sim_res, sim_res);
-            gl.uniform1i(gl.getUniformLocation(programs['cloud_plane'], 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
-            gl.uniform1f(gl.getUniformLocation(programs['cloud_plane'], 'pen_size'), document.getElementById('pen-size').value);
-            gl.uniform2f(gl.getUniformLocation(programs['cloud_plane'], 'mouse_pos'), mouse_state.x, mouse_state.y);
-            gl.uniform2f(gl.getUniformLocation(programs['cloud_plane'], 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
-            gl.uniform1i(gl.getUniformLocation(programs['cloud_plane'], 'mouse_btns'), mouse_state.buttons);
-            gl.uniform1i(gl.getUniformLocation(programs['cloud_plane'], 'cloud_mode'), cloud_mode_options.indexOf(cloud_mode_el.value));
-            gl.uniformMatrix4fv(gl.getUniformLocation(programs['cloud_plane'], 'M_camera'), gl.FALSE, M_camera);
-            gl.uniformMatrix4fv(gl.getUniformLocation(programs['cloud_plane'], 'M_camera_inv'), gl.FALSE, M_camera_inv);
-            gl.uniformMatrix4fv(gl.getUniformLocation(programs['cloud_plane'], 'M_sun'), gl.FALSE, M_sun);
-            gl.uniform2f(gl.getUniformLocation(programs['cloud_plane'], 'sim_res'), sim_res, sim_res);
-            gl.uniform1f(gl.getUniformLocation(programs['cloud_plane'], 'cloud_density'), 200 / n_cloud_planes);
-            gl.uniform1f(gl.getUniformLocation(programs['cloud_plane'], 'near'), near);
-            gl.uniform1f(gl.getUniformLocation(programs['cloud_plane'], 'far'), far);
-            gl.uniform3f(gl.getUniformLocation(programs['cloud_plane'], 'camera_pos'), camera_pos[0], camera_pos[1], camera_pos[2]);
-            gl.uniform3fv(gl.getUniformLocation(programs['cloud_plane'], 'sun_dir'), sun_dir);
+            gl.uniform2f(gl.getUniformLocation(programs.cloud_plane.program, 'sim_res'), sim_res, sim_res);
+            gl.uniform1i(gl.getUniformLocation(programs.cloud_plane.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
+            gl.uniform1f(gl.getUniformLocation(programs.cloud_plane.program, 'pen_size'), document.getElementById('pen-size').value);
+            gl.uniform2f(gl.getUniformLocation(programs.cloud_plane.program, 'mouse_pos'), mouse_state.x, mouse_state.y);
+            gl.uniform2f(gl.getUniformLocation(programs.cloud_plane.program, 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
+            gl.uniform1i(gl.getUniformLocation(programs.cloud_plane.program, 'mouse_btns'), mouse_state.buttons);
+            gl.uniform1i(gl.getUniformLocation(programs.cloud_plane.program, 'cloud_mode'), cloud_mode_options.indexOf(cloud_mode_el.value));
+            gl.uniformMatrix4fv(gl.getUniformLocation(programs.cloud_plane.program, 'M_camera'), gl.FALSE, M_camera);
+            gl.uniformMatrix4fv(gl.getUniformLocation(programs.cloud_plane.program, 'M_camera_inv'), gl.FALSE, M_camera_inv);
+            gl.uniformMatrix4fv(gl.getUniformLocation(programs.cloud_plane.program, 'M_sun'), gl.FALSE, M_sun);
+            gl.uniform2f(gl.getUniformLocation(programs.cloud_plane.program, 'sim_res'), sim_res, sim_res);
+            gl.uniform1f(gl.getUniformLocation(programs.cloud_plane.program, 'cloud_density'), 200 / n_cloud_planes);
+            gl.uniform1f(gl.getUniformLocation(programs.cloud_plane.program, 'near'), near);
+            gl.uniform1f(gl.getUniformLocation(programs.cloud_plane.program, 'far'), far);
+            gl.uniform3f(gl.getUniformLocation(programs.cloud_plane.program, 'camera_pos'), camera_pos[0], camera_pos[1], camera_pos[2]);
+            gl.uniform3fv(gl.getUniformLocation(programs.cloud_plane.program, 'sun_dir'), sun_dir);
             for (var i = 0; i < textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(programs['cloud_plane'], textures[i].name), i);
+                gl.uniform1i(gl.getUniformLocation(programs.cloud_plane.program, textures[i].name), i);
             }
-            gl.uniform1i(gl.getUniformLocation(programs['cloud_plane'], 'light_t'), 6);
+            gl.uniform1i(gl.getUniformLocation(programs.cloud_plane.program, 'light_t'), 6);
             gl.drawArrays(gl.TRIANGLES, 0, 3 * cloud_planes.length);
         } else if (render_mode_el.value == 'sun'){
             
