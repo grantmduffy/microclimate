@@ -230,10 +230,10 @@ function set_sun_matrix(M){
     M[11] = 0;
 
     // row 3
-    M[12] = -1
-    M[13] = -1
+    M[12] = -1;
+    M[13] = -1;
     M[14] = (z_max + z_min) / (z_max - z_min);
-    M[15] = 1
+    M[15] = 1;
 
 }
 
@@ -261,157 +261,37 @@ function init(){
     for (var i = 0; i < cloud_mode_el.children.length; i++){
         cloud_mode_options.push(cloud_mode_el.children[i].value);
     }
-    
-    // compile shaders
-    compile_program('glsl/sim_vs.glsl', 'glsl/sim_fs.glsl').then((program) => {
-        let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
-        gl.enableVertexAttribArray(pos_attr_loc);    
-        programs['sim'] = {
-            program: program,
-            pos_attr_loc: pos_attr_loc
-        };
-    });
-    compile_program('glsl/render2d_vs.glsl', 'glsl/render2d_fs.glsl').then((program) => {
-        let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
-        gl.enableVertexAttribArray(pos_attr_loc);
-        programs['render2d'] = {
-            program: program,
-            pos_attr_loc: pos_attr_loc
-        };
-    });
-    compile_program('glsl/arrow_vs.glsl', 'glsl/arrow_fs.glsl').then((program) => {
-        let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
-        gl.enableVertexAttribArray(pos_attr_loc);
-        programs['arrow'] = {
-            program: program,
-            pos_attr_loc: pos_attr_loc
-        };
-    });
-    compile_program('glsl/render3d_vs.glsl', 'glsl/render2d_fs.glsl').then((program) => {
-        let mesh_attr_loc = gl.getAttribLocation(program, 'vert_pos');
-        gl.enableVertexAttribArray(mesh_attr_loc);
-        programs['render3d'] = {
-            program: program,
-            pos_attr_loc: mesh_attr_loc
-        };
-    });
-    compile_program('glsl/water_vs.glsl', 'glsl/water_fs.glsl').then((program) => {
-        let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
-        gl.enableVertexAttribArray(pos_attr_loc);
-        programs['water'] = {
-            program: program,
-            pos_attr_loc: pos_attr_loc
-        };
-    });
-    compile_program('glsl/cloud_plane_vs.glsl', 'glsl/cloud_plane_fs.glsl').then((program) => {
-        let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
-        gl.enableVertexAttribArray(pos_attr_loc);
-        programs['cloud_plane'] = {
-            program: program,
-            pos_attr_loc: pos_attr_loc
-        };
-    });
-    compile_program('glsl/sun_vs.glsl', 'glsl/sun_fs.glsl').then((program) => {
-        let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
-        gl.enableVertexAttribArray(pos_attr_loc);
-        programs['sun'] = {
-            program: program,
-            pos_attr_loc: pos_attr_loc
-        };
-    });
-
-    // setup buffers
-    let vertex_buffer = create_buffer(new Float32Array(screen_mesh[0].flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
-    let tri_buffer = create_buffer(new Uint16Array(screen_mesh[1].flat()), gl.ELEMENT_ARRAY_BUFFER, gl.STATIC_DRAW);
-    arrows = get_arrows(50);
-    let arrow_buffer = create_buffer(new Float32Array(arrows.flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
-    grid_mesh = get_grid_mesh(sim_res, sim_res);
-    let grid_mesh_buffer = create_buffer(new Float32Array(grid_mesh.flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
-    cloud_planes = get_cloud_planes(n_cloud_planes);
-    let cloud_planes_buffer = create_buffer(new Float32Array(cloud_planes.flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
-
-    // textures
-    let sim_fbo = gl.createFramebuffer();
-    let sim_depthbuffer = gl.createRenderbuffer();
-    let tex_names = ['low0_t', 'low1_t', 'high0_t', 'high1_t', 'mid_t', 'other_t'];
-    let tex_defaults = [
-        [0.3, 0, 0, 0],  // low0 wind [0.3, 0.3] 
-        [0, 1, 0, 0],    // low1 surface temp 1
-        [0.3, 0, 0, 0],  // high0
-        [0, 0.5, 0, 0],  // high1
-        [0, 1, 0, 0],    // other temp 1
-        [0, 0, 0, 0]     // light
-    ];
-    let textures = [];
-    for (var i = 0; i < tex_names.length; i++){
-        textures.push({
-            'name': tex_names[i],
-            'in_tex': create_texture(sim_res, sim_res, tex_defaults[i], i, 'tile'),
-            'out_tex': create_texture(sim_res, sim_res, tex_defaults[i], i, 'tile')
-        });
-    }
-    
-    // setup fbo
-    gl.bindRenderbuffer(gl.RENDERBUFFER, sim_depthbuffer);
-    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, sim_res, sim_res);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, sim_fbo);
-    gl.drawBuffers([
-        gl.COLOR_ATTACHMENT0,
-        gl.COLOR_ATTACHMENT1,
-        gl.COLOR_ATTACHMENT2,
-        gl.COLOR_ATTACHMENT3,
-        gl.COLOR_ATTACHMENT4,
-        gl.COLOR_ATTACHMENT5,
-        // gl.COLOR_ATTACHMENT6,
-        // gl.COLOR_ATTACHMENT7,
-    ]);
-    
-    let sun_fbo = gl.createFramebuffer();
-    let sun_depthbuffer = gl.createRenderbuffer();
-    let sun_tex = create_texture(sim_res, sim_res, [1, 1, 1, 1], 6, 'tile');
-    gl.bindRenderbuffer(gl.RENDERBUFFER, sun_depthbuffer);
-    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, sim_res, sim_res);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, sun_fbo);
-    gl.drawBuffers([
-        gl.COLOR_ATTACHMENT0
-    ]);
-    gl.framebufferTexture2D(
-        gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
-        gl.TEXTURE_2D, sun_tex, 0
-    );
-    gl.activeTexture(gl.TEXTURE0 + 6);
-    gl.bindTexture(gl.TEXTURE_2D, sun_tex);
 
     let loop = function(){
         gl.disable(gl.BLEND);
         gl.enable(gl.DEPTH_TEST);
         // sim program
-        gl.useProgram(programs.sim);
+        gl.useProgram(programs.sim.program);
         gl.viewport(0, 0, sim_res, sim_res);
-        gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, tri_buffer);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, sim_fbo);
+        gl.bindBuffer(gl.ARRAY_BUFFER, programs.buffers.vertex_buffer);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, programs.buffers.tri_buffer);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, programs.fbos.sim_fbo);
         gl.vertexAttribPointer(
             programs.render2d.pos_attr_loc, 2,
             gl.FLOAT, gl.FALSE,
             2 * 4, 0
         );
-        for (var i = 0; i < textures.length; i++){
+        for (var i = 0; i < programs.textures.length; i++){
 
             // swap textures
-            [textures[i].in_tex, textures[i].out_tex] = [textures[i].out_tex, textures[i].in_tex];
+            [programs.textures[i].in_tex, programs.textures[i].out_tex] = [programs.textures[i].out_tex, programs.textures[i].in_tex];
 
             // set active in textures (for all programs)
             gl.activeTexture(gl.TEXTURE0 + i);
-            gl.bindTexture(gl.TEXTURE_2D, textures[i].in_tex);
+            gl.bindTexture(gl.TEXTURE_2D, programs.textures[i].in_tex);
 
             // set in texture uniforms for sim_program
-            gl.uniform1i(gl.getUniformLocation(sim_program, textures[i].name), i);
+            gl.uniform1i(gl.getUniformLocation(programs.sim.program, programs.textures[i].name), i);
 
             // set out textures for sim_fbo
             gl.framebufferTexture2D(
                 gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i,
-                gl.TEXTURE_2D, textures[i].out_tex, 0
+                gl.TEXTURE_2D, programs.textures[i].out_tex, 0
             );
 
         }
@@ -442,20 +322,20 @@ function init(){
         canvas.height = sim_res;
 
         gl.useProgram(programs.sun.program);
-        for (var i = 0; i < textures.length; i++){
-            gl.uniform1i(gl.getUniformLocation(sun_program, textures[i].name), i);
+        for (var i = 0; i < programs.textures.length; i++){
+            gl.uniform1i(gl.getUniformLocation(programs.sun.program, programs.textures[i].name), i);
         }
         gl.uniformMatrix4fv(gl.getUniformLocation(programs.sun.program, 'M_sun'), gl.FALSE, M_sun);
         gl.uniform3fv(gl.getUniformLocation(programs.sun.program, 'sun_dir'), sun_dir)
         if (render_mode_el.value != 'sun'){
-            gl.bindFramebuffer(gl.FRAMEBUFFER, sun_fbo);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, programs.fbos.sun_fbo);
         } else {
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         }
-        gl.bindBuffer(gl.ARRAY_BUFFER, grid_mesh_buffer);
+        gl.bindBuffer(gl.ARRAY_BUFFER, programs.buffers.grid_mesh_buffer);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
         gl.vertexAttribPointer(
-            grid_mesh_attr_loc, 2,
+            programs.sun.pos_attr_loc, 2,
             gl.FLOAT, gl.FALSE,
             2 * 4, 0
         );
@@ -470,8 +350,8 @@ function init(){
             
             // draw render2d
             gl.useProgram(programs.render2d.program);
-            for (var i = 0; i < textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(render2d_program, textures[i].name), i);
+            for (var i = 0; i < programs.textures.length; i++){
+                gl.uniform1i(gl.getUniformLocation(render2d_program, programs.textures[i].name), i);
             }
             gl.uniform2f(gl.getUniformLocation(programs.render2d.program, 'sim_res'), sim_res, sim_res);
             gl.uniform1i(gl.getUniformLocation(programs.render2d.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
@@ -490,15 +370,15 @@ function init(){
 
             // draw arrows
             gl.useProgram(programs.arrow.program);
-            gl.bindBuffer(gl.ARRAY_BUFFER, arrow_buffer);
+            gl.bindBuffer(gl.ARRAY_BUFFER, programs.buffers.arrow_buffer);
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
             gl.vertexAttribPointer(
                 programs.arrow.pos_attr_loc, 3,
                 gl.FLOAT, gl.FALSE,
                 3 * 4, 0
             );
-            for (var i = 0; i < textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(programs.arrow.program, textures[i].name), i);
+            for (var i = 0; i < programs.textures.length; i++){
+                gl.uniform1i(gl.getUniformLocation(programs.arrow.program, programs.textures[i].name), i);
             }
             gl.drawArrays(gl.LINES, 0, arrows.length * 2);
         } else if (render_mode_el.value == '3d'){
@@ -517,12 +397,12 @@ function init(){
             canvas.height = render_height;
 
             gl.viewport(0, 0, render_width, render_height);
-            gl.useProgram(render3d_program);
+            gl.useProgram(programs.render3d.program);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-            gl.bindBuffer(gl.ARRAY_BUFFER, grid_mesh_buffer);
+            gl.bindBuffer(gl.ARRAY_BUFFER, programs.buffers.grid_mesh_buffer);
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
             gl.vertexAttribPointer(
-                grid_mesh_attr_loc, 2,
+                programs.render3d.pos_attr_loc, 2,
                 gl.FLOAT, gl.FALSE,
                 2 * 4, 0
             );
@@ -538,8 +418,8 @@ function init(){
             gl.uniform1i(gl.getUniformLocation(programs.render3d.program, 'light_t'), 6);
             gl.uniformMatrix4fv(gl.getUniformLocation(programs.render3d.program, 'M_sun'), gl.FALSE, M_sun);
             gl.uniform3f(gl.getUniformLocation(programs.render3d.program, 'camera_pos'), camera_pos[0], camera_pos[1], camera_pos[2]);
-            for (var i = 0; i < textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(programs.render3d.program, textures[i].name), i);
+            for (var i = 0; i < programs.textures.length; i++){
+                gl.uniform1i(gl.getUniformLocation(programs.render3d.program, programs.textures[i].name), i);
             }
             gl.clearColor(191/255, 240/255, 1, 1);
             gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
@@ -560,19 +440,19 @@ function init(){
             gl.uniform1i(gl.getUniformLocation(programs.water.program, 'light_t'), 6);
             gl.uniformMatrix4fv(gl.getUniformLocation(programs.water.program, 'M_sun'), gl.FALSE, M_sun);
             gl.uniform3f(gl.getUniformLocation(programs.water.program, 'camera_pos'), camera_pos[0], camera_pos[1], camera_pos[2]);
-            for (var i = 0; i < textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(programs.water.program, textures[i].name), i);
+            for (var i = 0; i < programs.textures.length; i++){
+                gl.uniform1i(gl.getUniformLocation(programs.water.program, programs.textures[i].name), i);
             }
             gl.drawArrays(gl.TRIANGLES, 0, grid_mesh.length * 3);
 
 
             // draw plane clouds
-            gl.useProgram(programs.cloud.program);
+            gl.useProgram(programs.cloud_plane.program);
             // gl.disable(gl.DEPTH_TEST);
-            gl.bindBuffer(gl.ARRAY_BUFFER, cloud_planes_buffer);
+            gl.bindBuffer(gl.ARRAY_BUFFER, programs.buffers.cloud_planes_buffer);
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
             gl.vertexAttribPointer(
-                programs.cloud.pos_attr_loc, 3,
+                programs.cloud_plane.pos_attr_loc, 3,
                 gl.FLOAT, gl.FALSE,
                 3 * 4, 0
             );
@@ -592,8 +472,8 @@ function init(){
             gl.uniform1f(gl.getUniformLocation(programs.cloud_plane.program, 'far'), far);
             gl.uniform3f(gl.getUniformLocation(programs.cloud_plane.program, 'camera_pos'), camera_pos[0], camera_pos[1], camera_pos[2]);
             gl.uniform3fv(gl.getUniformLocation(programs.cloud_plane.program, 'sun_dir'), sun_dir);
-            for (var i = 0; i < textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(programs.cloud_plane.program, textures[i].name), i);
+            for (var i = 0; i < programs.textures.length; i++){
+                gl.uniform1i(gl.getUniformLocation(programs.cloud_plane.program, programs.textures[i].name), i);
             }
             gl.uniform1i(gl.getUniformLocation(programs.cloud_plane.program, 'light_t'), 6);
             gl.drawArrays(gl.TRIANGLES, 0, 3 * cloud_planes.length);
@@ -609,5 +489,141 @@ function init(){
         // setTimeout(() =>{requestAnimationFrame(loop);}, 1000 / fps);
         requestAnimationFrame(loop);  // unlimited fps
     }
-    requestAnimationFrame(loop);
+    
+    // compile shaders
+    Promise.all([
+        compile_program('glsl/sim_vs.glsl', 'glsl/sim_fs.glsl').then((program) => {
+            let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+            gl.enableVertexAttribArray(pos_attr_loc);    
+            programs['sim'] = {
+                program: program,
+                pos_attr_loc: pos_attr_loc
+            };
+        }),
+        compile_program('glsl/render2d_vs.glsl', 'glsl/render2d_fs.glsl').then((program) => {
+            let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+            gl.enableVertexAttribArray(pos_attr_loc);
+            programs['render2d'] = {
+                program: program,
+                pos_attr_loc: pos_attr_loc
+            };
+        }),
+        compile_program('glsl/arrow_vs.glsl', 'glsl/arrow_fs.glsl').then((program) => {
+            let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+            gl.enableVertexAttribArray(pos_attr_loc);
+            programs['arrow'] = {
+                program: program,
+                pos_attr_loc: pos_attr_loc
+            };
+        }),
+        compile_program('glsl/render3d_vs.glsl', 'glsl/render2d_fs.glsl').then((program) => {
+            let mesh_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+            gl.enableVertexAttribArray(mesh_attr_loc);
+            programs['render3d'] = {
+                program: program,
+                pos_attr_loc: mesh_attr_loc
+            };
+        }),
+        compile_program('glsl/water_vs.glsl', 'glsl/water_fs.glsl').then((program) => {
+            let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+            gl.enableVertexAttribArray(pos_attr_loc);
+            programs['water'] = {
+                program: program,
+                pos_attr_loc: pos_attr_loc
+            };
+        }),
+        compile_program('glsl/cloud_plane_vs.glsl', 'glsl/cloud_plane_fs.glsl').then((program) => {
+            let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+            gl.enableVertexAttribArray(pos_attr_loc);
+            programs['cloud_plane'] = {
+                program: program,
+                pos_attr_loc: pos_attr_loc
+            };
+        }),
+        compile_program('glsl/sun_vs.glsl', 'glsl/sun_fs.glsl').then((program) => {
+            let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+            gl.enableVertexAttribArray(pos_attr_loc);
+            programs['sun'] = {
+                program: program,
+                pos_attr_loc: pos_attr_loc
+            };
+        })
+    ]).then(() => {
+
+        // setup buffers
+        let vertex_buffer = create_buffer(new Float32Array(screen_mesh[0].flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
+        let tri_buffer = create_buffer(new Uint16Array(screen_mesh[1].flat()), gl.ELEMENT_ARRAY_BUFFER, gl.STATIC_DRAW);
+        arrows = get_arrows(50);
+        let arrow_buffer = create_buffer(new Float32Array(arrows.flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
+        grid_mesh = get_grid_mesh(sim_res, sim_res);
+        let grid_mesh_buffer = create_buffer(new Float32Array(grid_mesh.flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
+        cloud_planes = get_cloud_planes(n_cloud_planes);
+        let cloud_planes_buffer = create_buffer(new Float32Array(cloud_planes.flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
+        programs['buffers'] = {
+            vertex_buffer: vertex_buffer,
+            tri_buffer: tri_buffer,
+            arrow_buffer: arrow_buffer,
+            grid_mesh_buffer: grid_mesh_buffer,
+            cloud_planes_buffer: cloud_planes_buffer
+        };
+
+        // textures
+        let sim_fbo = gl.createFramebuffer();
+        let sim_depthbuffer = gl.createRenderbuffer();
+        let tex_names = ['low0_t', 'low1_t', 'high0_t', 'high1_t', 'mid_t', 'other_t'];
+        let tex_defaults = [
+            [0.3, 0, 0, 0],  // low0 wind [0.3, 0.3] 
+            [0, 1, 0, 0],    // low1 surface temp 1
+            [0.3, 0, 0, 0],  // high0
+            [0, 0.5, 0, 0],  // high1
+            [0, 1, 0, 0],    // other temp 1
+            [0, 0, 0, 0]     // light
+        ];
+        programs['textures'] = [];
+        for (var i = 0; i < tex_names.length; i++){
+            programs.textures.push({
+                'name': tex_names[i],
+                'in_tex': create_texture(sim_res, sim_res, tex_defaults[i], i, 'tile'),
+                'out_tex': create_texture(sim_res, sim_res, tex_defaults[i], i, 'tile')
+            });
+        }
+        
+        // setup fbo
+        gl.bindRenderbuffer(gl.RENDERBUFFER, sim_depthbuffer);
+        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, sim_res, sim_res);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, sim_fbo);
+        gl.drawBuffers([
+            gl.COLOR_ATTACHMENT0,
+            gl.COLOR_ATTACHMENT1,
+            gl.COLOR_ATTACHMENT2,
+            gl.COLOR_ATTACHMENT3,
+            gl.COLOR_ATTACHMENT4,
+            gl.COLOR_ATTACHMENT5,
+            // gl.COLOR_ATTACHMENT6,
+            // gl.COLOR_ATTACHMENT7,
+        ]);
+        
+        let sun_fbo = gl.createFramebuffer();
+        let sun_depthbuffer = gl.createRenderbuffer();
+        let sun_tex = create_texture(sim_res, sim_res, [1, 1, 1, 1], 6, 'tile');
+        gl.bindRenderbuffer(gl.RENDERBUFFER, sun_depthbuffer);
+        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, sim_res, sim_res);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, sun_fbo);
+        gl.drawBuffers([
+            gl.COLOR_ATTACHMENT0
+        ]);
+        gl.framebufferTexture2D(
+            gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+            gl.TEXTURE_2D, sun_tex, 0
+        );
+        gl.activeTexture(gl.TEXTURE0 + 6);
+        gl.bindTexture(gl.TEXTURE_2D, sun_tex);
+
+        programs['fbos'] = {
+            sim_fbo: sim_fbo,
+            sun_fbo: sun_fbo
+        };
+        
+        requestAnimationFrame(loop);
+    });
 }
