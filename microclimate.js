@@ -243,7 +243,6 @@ function initialize_uniforms(){
     load_file('uniforms.json').then((uniforms) => {
         uniforms = JSON.parse(uniforms);
         for (let k in uniforms){
-            let type = uniforms[k].type;
             if ('input' in uniforms[k]){
                 var d = null;
                 switch (uniforms[k].input.type){
@@ -258,8 +257,10 @@ function initialize_uniforms(){
                         e.classList.add('col-8');
                         if ('min' in uniforms[k].input) e.min = uniforms[k].input.min;
                         if ('max' in uniforms[k].input) e.max = uniforms[k].input.max;
-                        if ('default' in uniforms[k]) e.value = uniforms[k].default;
-                        uniforms[k].value = uniforms[k].default;
+                        if ('default' in uniforms[k].input){
+                            e.value = uniforms[k].input.default;
+                            uniforms[k].value = uniforms[k].input.default;
+                        };
                         e.step = ('step' in uniforms[k].input) ? uniforms[k].input.step : 0.001;
                         e.addEventListener('input', function(){
                             this.parentElement.children[0].innerText = k + ': ' + parseFloat(this.value).toFixed(2);
@@ -269,13 +270,53 @@ function initialize_uniforms(){
                         d.appendChild(e);
                         break;
                     case 'dropdown':
+                        d = document.createElement('div');
+                        d.classList.add('row');
+                        l = document.createElement('label');
+                        l.innerText = k;
+                        l.classList.add('col');
+                        e = document.createElement('select');
+                        e.classList.add('col-8');
+                        for (let i = 0; i < uniforms[k].input.options.length; i++){
+                            o = document.createElement('option');
+                            o.value = i;
+                            o.innerText = uniforms[k].input.options[i];
+                            if ('default' in uniforms[k].input && uniforms[k].input.default == uniforms[k].input.options[i]){
+                                o.selected = true;
+                                uniforms[k].value = i;
+                            };
+                            e.appendChild(o);
+                        }
+                        e.addEventListener('input', function(){
+                            uniforms[k].value = parseInt(this.value);
+                        });
+                        d.appendChild(l);
+                        d.appendChild(e);
                         break;
                     case 'color':
+                        d = document.createElement('div');
+                        d.classList.add('row');
+                        l = document.createElement('label');
+                        l.innerText = k;
+                        l.classList.add('col');
+                        e = document.createElement('input');
+                        e.classList.add('col-8');
+                        e.type = 'color';
+                        if ('default' in uniforms[k].input) {
+                            uniforms[k].value = uniforms[k].input.default;
+                            e.value = rgba2hex(uniforms[k].input.default);
+                        }
+                        e.addEventListener('input', function(){
+                            uniforms[k].value = hex2rgba(this.value);
+                        });
+                        d.appendChild(l);
+                        d.appendChild(e);
                         break;
                 }
                 if (d != null) inputs_el.appendChild(d);
             }
         }
+        programs.uniforms = uniforms;
     });
 }
 

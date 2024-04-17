@@ -28,24 +28,6 @@
             "default": "elevation"
         }
     },
-    "pen_size": {
-        "type": "float",
-        "input": {
-            "type": "range",
-            "min": 0,
-            "max": 0.2,
-            "default": 0.1
-        }
-    },
-    "pen_strength": {
-        "type": "strength",
-        "input": {
-            "type": "range",
-            "min": 0,
-            "max": 2,
-            "default": 1
-        }
-    },
     "pen_vel": {
         "type": "vec2"
     },
@@ -85,6 +67,24 @@
             "default": "realistic"
         }
     },
+    "pen_size": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 0.2,
+            "default": 0.1
+        }
+    },
+    "pen_strength": {
+        "type": "strength",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 2,
+            "default": 1
+        }
+    },
     "M_camera": {
         "type": "mat4"
     },
@@ -105,29 +105,29 @@
     "ambient_color": {
         "type": "vec4",
         "input": {
-            "type": "color"
-        },
-        "default": [0.12, 0.16, 0.18, 1.0]
+            "type": "color",
+            "default": [0.12, 0.16, 0.18, 1.0]
+        }
     },
     "sun_color": {
         "type": "vec4",
         "input": {
-            "type": "color"
-        },
-        "default": [1.0, 1.0, 0.93, 1.0]
+            "type": "color",
+            "default": [1.0, 1.0, 0.93, 1.0]
+        }
     },
     "grass_color": {
         "type": "vec4",
         "input": {
-            "type": "color"
-        },
-        "default": [0.48, 1.0, 0.44, 1.0]
+            "type": "color",
+            "default": [0.48, 1.0, 0.44, 1.0]
+        }
     },
     "water_color": {
         "type": "vec4",
         "input": {
-            "type": "color"
-        },
-        "default": [0.26, 0.53, 0.96, 1.0]
+            "type": "color",
+            "default": [0.26, 0.53, 0.96, 1.0]
+        }
     }
 }
