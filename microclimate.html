@@ -93,7 +93,17 @@ label, input {
         <label for="pen-strength" class="column">pen strength</label>
         <input class="column" type="range" id="pen-strength" min="0" max="2" step="0.001" value="1">
       </div>
-      <div id="inputs" class="contianer"></div>
+      <div class="accordion" id="accordion">
+        <div class="card">
+          <div class="card-header" id="heading">
+            <button class="btn btn-primary collapsed" type="button" data-toggle="collapse" data-target="#collapse1" aria-expanded="false" aria-controls="inputs">Settings</button>
+          </div>
+          <div id="collapse1" class="collapse">
+            <div id="inputs" class="card-body" aria-labelledby="heading" data-parent="#accordian"><div>
+          </div>
+        </div>
+      </div>
+      <!-- <div id="inputs" class="contianer"></div> -->
     </div>
   </body>
 </html>
