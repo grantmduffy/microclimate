@@ -80,12 +80,9 @@ function compile_program(vs_src_path, fs_src_path, global_src_path = 'glsl/globa
         ]).then((args) => {
             try {
                 [global_src, vs_src, fs_src] = args;
-                // console.log('#version 300 es\n' + global_src + vs_src);
                 let vs = compile_shader('#version 300 es\n' + global_src + vs_src, gl.VERTEX_SHADER);
-                // console.log('#version 300 es\n' + global_src + fs_src);
                 let fs = compile_shader('#version 300 es\n' + global_src + fs_src, gl.FRAGMENT_SHADER);
                 let p = link_program(vs, fs);
-                console.log(p);
                 resolve(p);    
             } catch(err) {
                 reject(err);

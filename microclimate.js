@@ -238,6 +238,48 @@ function set_sun_matrix(M){
 }
 
 
+function initialize_uniforms(){
+    let inputs_el = document.getElementById('inputs');
+    load_file('uniforms.json').then((uniforms) => {
+        uniforms = JSON.parse(uniforms);
+        for (let k in uniforms){
+            let type = uniforms[k].type;
+            if ('input' in uniforms[k]){
+                var d = null;
+                switch (uniforms[k].input.type){
+                    case 'range':
+                        d = document.createElement('div');
+                        d.classList.add('row');
+                        l = document.createElement('label');
+                        l.innerText = k + ': ';
+                        l.classList.add('col');
+                        e = document.createElement('input');
+                        e.type = 'range';
+                        e.classList.add('col-8');
+                        if ('min' in uniforms[k].input) e.min = uniforms[k].input.min;
+                        if ('max' in uniforms[k].input) e.max = uniforms[k].input.max;
+                        if ('default' in uniforms[k]) e.value = uniforms[k].default;
+                        uniforms[k].value = uniforms[k].default;
+                        e.step = ('step' in uniforms[k].input) ? uniforms[k].input.step : 0.001;
+                        e.addEventListener('input', function(){
+                            this.parentElement.children[0].innerText = k + ': ' + parseFloat(this.value).toFixed(2);
+                            uniforms[k].value = parseFloat(this.value);
+                        });
+                        d.appendChild(l);
+                        d.appendChild(e);
+                        break;
+                    case 'dropdown':
+                        break;
+                    case 'color':
+                        break;
+                }
+                if (d != null) inputs_el.appendChild(d);
+            }
+        }
+    });
+}
+
+
 function init(){
     canvas = document.getElementById('gl-canvas')
     setup_gl(canvas);
@@ -548,7 +590,7 @@ function init(){
                 pos_attr_loc: pos_attr_loc
             };
         })
-    ]).then(() => {
+    ]).then(initialize_uniforms).then(() => {
 
         // setup buffers
         let vertex_buffer = create_buffer(new Float32Array(screen_mesh[0].flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);

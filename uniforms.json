@@ -1,0 +1,133 @@
+{
+    "mouse_pos": {
+        "type": "vec2"
+    },
+    "cursor_pos": {
+        "type": "vec2"
+    },
+    "mouse_btns": {
+        "type": "int"
+    },
+    "keys": {
+        "type": "int"
+    },
+    "sim_res": {
+        "type": "vec2"
+    },
+    "pen_type": {
+        "type": "int",
+        "input": {
+            "type": "dropdown",
+            "options": [
+                "all velocity",
+                "low velocity",
+                "high velocity",
+                "elevation",
+                "rain"
+            ],
+            "default": "elevation"
+        }
+    },
+    "pen_size": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 0.2,
+            "default": 0.1
+        }
+    },
+    "pen_strength": {
+        "type": "strength",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 2,
+            "default": 1
+        }
+    },
+    "pen_vel": {
+        "type": "vec2"
+    },
+    "M_sun": {
+        "type": "mat4"
+    },
+    "sun_dir": {
+        "type": "vec3"
+    },
+    "view_mode": {
+        "type": "int",
+        "input": {
+            "type": "dropdown",
+            "options": [
+                "low velocity",
+                "both velocity",
+                "uplift",
+                "elevation",
+                "clouds",
+                "realistic",
+                "temp"
+            ],
+            "default": "realistic"
+        }
+    },
+    "cloud_mode": {
+        "type": "int",
+        "input": {
+            "type": "dropdown",
+            "options": [
+                "velocity",
+                "uplift",
+                "pressure",
+                "realistic",
+                "temp"
+            ],
+            "default": "realistic"
+        }
+    },
+    "M_camera": {
+        "type": "mat4"
+    },
+    "M_camera_inv": {
+        "type": "mat4"
+    },
+    "cloud_density": {
+        "type": "float"
+    },
+    "near": {
+        "type": "float",
+        "default": 0.03
+    },
+    "far": {
+        "type": "float",
+        "default": 1.5
+    },
+    "ambient_color": {
+        "type": "vec4",
+        "input": {
+            "type": "color"
+        },
+        "default": [0.12, 0.16, 0.18, 1.0]
+    },
+    "sun_color": {
+        "type": "vec4",
+        "input": {
+            "type": "color"
+        },
+        "default": [1.0, 1.0, 0.93, 1.0]
+    },
+    "grass_color": {
+        "type": "vec4",
+        "input": {
+            "type": "color"
+        },
+        "default": [0.48, 1.0, 0.44, 1.0]
+    },
+    "water_color": {
+        "type": "vec4",
+        "input": {
+            "type": "color"
+        },
+        "default": [0.26, 0.53, 0.96, 1.0]
+    }
+}
