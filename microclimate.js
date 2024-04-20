@@ -317,6 +317,20 @@ function initialize_uniforms(){
             }
         }
         data.uniforms = uniforms;
+        for (const program_name in data.programs){
+            data.programs[program_name].uniform_locations = {};
+            console.log(program_name);
+            for (const uniform_name in data.uniforms){
+                let loc = gl.getUniformLocation(
+                    data.programs[program_name].program,
+                    uniform_name
+                );
+                if (loc != null){
+                    console.log('\t' + uniform_name);
+                    data.programs[program_name].uniform_locations[uniform_name] = loc;
+                }
+            }
+        }
     });
 }
 
@@ -670,6 +684,18 @@ function init(){
                 'in_tex': create_texture(sim_res, sim_res, tex_defaults[i], i, 'tile'),
                 'out_tex': create_texture(sim_res, sim_res, tex_defaults[i], i, 'tile')
             });
+        }
+        for (const program_name in data.programs){
+            for (var i = 0; i < data.textures.length; i++){
+                console.log(program_name, data.textures[i].name);
+                let loc = gl.getUniformLocation(
+                    data.programs[program_name].program,
+                    data.textures[i].name
+                );
+                if (loc != null){
+                    data.programs[program_name].uniform_locations[data.textures[i].name] = loc;
+                }
+            }
         }
         
         // setup fbo

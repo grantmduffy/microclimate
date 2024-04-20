@@ -129,5 +129,9 @@
             "type": "color",
             "default": [0.26, 0.53, 0.96, 1.0]
         }
+    },
+    "light_t": {
+        "type": "int",
+        "value": 6
     }
 }
