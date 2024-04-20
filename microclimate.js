@@ -238,11 +238,68 @@ function set_sun_matrix(M){
 }
 
 
-function initialize_uniforms(){
+async function initialize_uniforms(){
     let inputs_el = document.getElementById('inputs');
     return load_file('uniforms.json').then((uniforms) => {
         uniforms = JSON.parse(uniforms);
         for (let k in uniforms){
+
+            // setup value buffers
+            if (!('value' in uniforms[k])){
+                switch(uniforms[k].type){
+                    case 'bool':
+                        uniforms[k].value = false;
+                        break;
+                    case 'int':
+                        uniforms[k].value = 0;
+                        break;
+                    case 'uint':
+                        uniforms[k].value = 0;
+                        break;
+                    case 'float':
+                        uniforms[k].value = 0.0;
+                        break;
+                    case 'double':
+                        uniforms[k].value = 0.0;
+                        break;
+                    default:
+                        let vec_re = /([biud]?)vec([234]?)$/.exec(uniforms[k].type);
+                        if (vec_re != null){
+                            [_, dtype, n] = vec_re;
+                            n = parseFloat(n);
+                            switch (dtype){
+                                case '':
+                                    uniforms[k].value = new Float32Array(n);
+                                    break;
+                                case 'b':
+                                    uniforms[k].value = new Uint8Array(n);
+                                    break;
+                                case 'i':
+                                    uniforms[k].value = new Int32Array(n);
+                                    break;
+                                case 'u':
+                                    uniforms[k].value = new Uint32Array(n);
+                                    break;
+                                case 'd':
+                                    uniforms[k].value = new Float64Array(n);
+                                    break;
+                            }
+                        }
+                        let mat_re = /(d?)mat([234])x?([234]?)/.exec(uniforms[k].type);
+                        if (mat_re != null){
+                            [_, dtype, n, m] = mat_re;
+                            n = m == '' ? parseInt(n) : parseInt(n) * parseInt(m);
+                            if (dtype == 'd'){
+                                uniforms[k].value = new Float64Array(n);
+                            } else {
+                                uniforms[k].value = new Float32Array(n);
+                            }
+                        }
+                    
+                }
+            }
+
+            // setup UI for uniforms
             if ('input' in uniforms[k]){
                 var d = null;
                 switch (uniforms[k].input.type){
@@ -335,6 +392,68 @@ function initialize_uniforms(){
 }
 
 
+function set_uniforms(){
+    for (program_name in data.programs){
+        gl.useProgram(data.programs[program_name].program);
+        for (uniform_name in data.programs[program_name].uniform_locations){
+            console.log(uniform_name, data.uniforms[uniform_name].value);
+            let loc = data.programs[program_name].uniform_locations[uniform_name];
+            let value = data.uniforms[uniform_name].value;
+            switch (data.uniforms[uniform_name].type){
+                case 'bool':
+                case 'int':
+                case 'uint':  
+                case 'sampler2D':      
+                    gl.uniform1i(loc, value);
+                    break;
+                case 'float':
+                case 'double':
+                    gl.uniform1f(loc, value);
+                    break;
+                case 'bvec2':
+                case 'ivec2':
+                case 'uvec2':
+                    gl.uniform2iv(loc, value);
+                    break;
+                case 'vec2':
+                case 'dvec2':
+                    gl.uniform2fv(loc, value);
+                    break;
+                case 'bvec3':
+                case 'ivec3':
+                case 'uvec3':
+                    gl.uniform3iv(loc, value);
+                    break;
+                case 'vec3':
+                case 'dvec3':
+                    gl.uniform3fv(loc, value);
+                    break;
+                case 'bvec4':
+                case 'ivec4':
+                case 'uvec4':
+                    gl.uniform4iv(loc, value);
+                    break;
+                case 'vec4':
+                case 'dvec4':
+                    gl.uniform4fv(loc, value);
+                    break;
+                case 'mat2':
+                case 'dmat2':
+                    gl.uniformMatrix2fv(loc, gl.FALSE, value);
+                    break;
+                case 'dmat3':
+                case 'mat3':
+                    gl.uniformMatrix3fv(loc, gl.FALSE, value);
+                    break;
+                case 'dmat4':
+                case 'mat4':
+                    gl.uniformMatrix4fv(loc, gl.FALSE, value);
+                    break;
+            }
+        }
+    }
+}
+
 function init(){
     canvas = document.getElementById('gl-canvas')
     setup_gl(canvas);
@@ -360,6 +479,9 @@ function init(){
     }
 
     let loop = function(){
+
+        set_uniforms();
+
         gl.disable(gl.BLEND);
         gl.enable(gl.DEPTH_TEST);
         // sim program
@@ -684,6 +806,10 @@ function init(){
                 'in_tex': create_texture(sim_res, sim_res, tex_defaults[i], i, 'tile'),
                 'out_tex': create_texture(sim_res, sim_res, tex_defaults[i], i, 'tile')
             });
+            data.uniforms[tex_names[i]] = {
+                'type': 'sampler2D',
+                'value': i
+            };
         }
         for (const program_name in data.programs){
             for (var i = 0; i < data.textures.length; i++){
