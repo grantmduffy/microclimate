@@ -666,6 +666,7 @@ function init(){
         data.textures = [];
         for (var i = 0; i < tex_names.length; i++){
             data.textures.push({
+                'name': tex_names[i],
                 'in_tex': create_texture(sim_res, sim_res, tex_defaults[i], i, 'tile'),
                 'out_tex': create_texture(sim_res, sim_res, tex_defaults[i], i, 'tile')
             });
