@@ -288,7 +288,7 @@ async function initialize_uniforms(){
                         let mat_re = /(d?)mat([234])x?([234]?)/.exec(uniforms[k].type);
                         if (mat_re != null){
                             [_, dtype, n, m] = mat_re;
-                            n = m == '' ? parseInt(n) : parseInt(n) * parseInt(m);
+                            n = m == '' ? parseInt(n) ** 2: parseInt(n) * parseInt(m);
                             if (dtype == 'd'){
                                 uniforms[k].value = new Float64Array(n);
                             } else {
@@ -376,14 +376,14 @@ async function initialize_uniforms(){
         data.uniforms = uniforms;
         for (const program_name in data.programs){
             data.programs[program_name].uniform_locations = {};
-            console.log(program_name);
+            // console.log(program_name);
             for (const uniform_name in data.uniforms){
                 let loc = gl.getUniformLocation(
                     data.programs[program_name].program,
                     uniform_name
                 );
                 if (loc != null){
-                    console.log('\t' + uniform_name);
+                    // console.log('\t' + uniform_name);
                     data.programs[program_name].uniform_locations[uniform_name] = loc;
                 }
             }
@@ -396,7 +396,6 @@ function set_uniforms(){
     for (program_name in data.programs){
         gl.useProgram(data.programs[program_name].program);
         for (uniform_name in data.programs[program_name].uniform_locations){
-            console.log(uniform_name, data.uniforms[uniform_name].value);
             let loc = data.programs[program_name].uniform_locations[uniform_name];
             let value = data.uniforms[uniform_name].value;
             switch (data.uniforms[uniform_name].type){
