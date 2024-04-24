@@ -43,7 +43,6 @@ let mouse_state = {
 var canvas = null;
 const fps = 10;
 const K_drag = 100;
-const sim_res = 512;
 const render_width = 640;
 const render_height = 480;
 let M_camera = new Float32Array(16);
@@ -52,8 +51,6 @@ let M_perspective = new Float32Array(16);
 let M_sun = new Float32Array(16);
 let camera_pos = [0.5, 0.5, 0.25];
 let camera_rot = [45, 0];
-// let camera_pos = [0.5, 0.5, 2];
-// let camera_rot = [0, 0];
 let near = 0.03
 let far = 1.5
 const PI = 3.14159
@@ -493,7 +490,7 @@ function init(){
         gl.enable(gl.DEPTH_TEST);
         // sim program
         gl.useProgram(data.programs.sim.program);
-        gl.viewport(0, 0, sim_res, sim_res);
+        gl.viewport(0, 0, data.uniforms.sim_res.value[1], data.uniforms.sim_res.value[0]);
         gl.bindBuffer(gl.ARRAY_BUFFER, data.buffers.vertex_buffer);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, data.buffers.tri_buffer);
         gl.bindFramebuffer(gl.FRAMEBUFFER, data.fbos.sim_fbo);
@@ -523,10 +520,6 @@ function init(){
         }
         
         // set uniforms
-        gl.uniform2f(gl.getUniformLocation(data.programs.sim.program, 'sim_res'), sim_res, sim_res);
-        gl.uniform1i(gl.getUniformLocation(data.programs.sim.program, 'pen_type'), pen_type_options.indexOf(pen_type_el.value));
-        gl.uniform1f(gl.getUniformLocation(data.programs.sim.program, 'pen_size'), document.getElementById('pen-size').value);
-        gl.uniform1f(gl.getUniformLocation(data.programs.sim.program, 'pen_strength'), document.getElementById('pen-strength').value);
         gl.uniform1i(gl.getUniformLocation(data.programs.sim.program, 'light_t'), 6);
         gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.sim.program, 'M_sun'), gl.FALSE, M_sun);
         
@@ -538,8 +531,8 @@ function init(){
         
         // draw sun layer
         set_sun_matrix(M_sun);
-        canvas.width = sim_res;
-        canvas.height = sim_res;
+        // canvas.width = sim_res;
+        // canvas.height = sim_res;
 
         gl.useProgram(data.programs.sun.program);
         for (var i = 0; i < data.textures.length; i++){
@@ -565,18 +558,15 @@ function init(){
 
         if (render_mode_el.value == '2d'){
 
-            canvas.width = sim_res;
-            canvas.height = sim_res;
+            canvas.width = data.uniforms.sim_res.value[1];
+            canvas.height = data.uniforms.sim_res.value[0];
             
             // draw render2d
             gl.useProgram(data.programs.render2d.program);
             for (var i = 0; i < data.textures.length; i++){
                 gl.uniform1i(gl.getUniformLocation(render2d_program, data.textures[i].name), i);
             }
-            gl.uniform2f(gl.getUniformLocation(data.programs.render2d.program, 'sim_res'), sim_res, sim_res);
             gl.uniform1i(gl.getUniformLocation(data.programs.render2d.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
-            gl.uniform1f(gl.getUniformLocation(data.programs.render2d.program, 'pen_size'), document.getElementById('pen-size').value);
-            gl.uniform2f(gl.getUniformLocation(data.programs.render2d.program, 'sim_res'), sim_res, sim_res);
             gl.uniform3fv(gl.getUniformLocation(data.programs.render2d.program, 'sun_dir'), sun_dir)
             gl.uniform1i(gl.getUniformLocation(data.programs.render2d.program, 'light_t'), 6);
             gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.render2d.program, 'M_sun'), gl.FALSE, M_sun);
@@ -623,11 +613,8 @@ function init(){
                 gl.FLOAT, gl.FALSE,
                 2 * 4, 0
             );
-            gl.uniform2f(gl.getUniformLocation(data.programs.render3d.program, 'sim_res'), sim_res, sim_res);
             gl.uniform1i(gl.getUniformLocation(data.programs.render3d.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
-            gl.uniform1f(gl.getUniformLocation(data.programs.render3d.program, 'pen_size'), document.getElementById('pen-size').value);
             gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.render3d.program, 'M_camera'), gl.FALSE, M_camera);
-            gl.uniform2f(gl.getUniformLocation(data.programs.render3d.program, 'sim_res'), sim_res, sim_res);
             gl.uniform3fv(gl.getUniformLocation(data.programs.render3d.program, 'sun_dir'), sun_dir)
             gl.uniform1i(gl.getUniformLocation(data.programs.render3d.program, 'light_t'), 6);
             gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.render3d.program, 'M_sun'), gl.FALSE, M_sun);
@@ -642,11 +629,8 @@ function init(){
             // draw water
             gl.useProgram(data.programs.water.program);
             gl.enable(gl.BLEND);
-            gl.uniform2f(gl.getUniformLocation(data.programs.water.program, 'sim_res'), sim_res, sim_res);
             gl.uniform1i(gl.getUniformLocation(data.programs.water.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
-            gl.uniform1f(gl.getUniformLocation(data.programs.water.program, 'pen_size'), document.getElementById('pen-size').value);
             gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.water.program, 'M_camera'), gl.FALSE, M_camera);
-            gl.uniform2f(gl.getUniformLocation(data.programs.water.program, 'sim_res'), sim_res, sim_res);
             gl.uniform3fv(gl.getUniformLocation(data.programs.water.program, 'sun_dir'), sun_dir)
             gl.uniform1i(gl.getUniformLocation(data.programs.water.program, 'light_t'), 6);
             gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.water.program, 'M_sun'), gl.FALSE, M_sun);
@@ -659,7 +643,6 @@ function init(){
 
             // draw plane clouds
             gl.useProgram(data.programs.cloud_plane.program);
-            // gl.disable(gl.DEPTH_TEST);
             gl.bindBuffer(gl.ARRAY_BUFFER, data.buffers.cloud_planes_buffer);
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
             gl.vertexAttribPointer(
@@ -667,14 +650,11 @@ function init(){
                 gl.FLOAT, gl.FALSE,
                 3 * 4, 0
             );
-            gl.uniform2f(gl.getUniformLocation(data.programs.cloud_plane.program, 'sim_res'), sim_res, sim_res);
             gl.uniform1i(gl.getUniformLocation(data.programs.cloud_plane.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
-            gl.uniform1f(gl.getUniformLocation(data.programs.cloud_plane.program, 'pen_size'), document.getElementById('pen-size').value);
             gl.uniform1i(gl.getUniformLocation(data.programs.cloud_plane.program, 'cloud_mode'), cloud_mode_options.indexOf(cloud_mode_el.value));
             gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.cloud_plane.program, 'M_camera'), gl.FALSE, M_camera);
             gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.cloud_plane.program, 'M_camera_inv'), gl.FALSE, M_camera_inv);
             gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.cloud_plane.program, 'M_sun'), gl.FALSE, M_sun);
-            gl.uniform2f(gl.getUniformLocation(data.programs.cloud_plane.program, 'sim_res'), sim_res, sim_res);
             gl.uniform1f(gl.getUniformLocation(data.programs.cloud_plane.program, 'cloud_density'), 200 / n_cloud_planes);
             gl.uniform1f(gl.getUniformLocation(data.programs.cloud_plane.program, 'near'), near);
             gl.uniform1f(gl.getUniformLocation(data.programs.cloud_plane.program, 'far'), far);
@@ -758,6 +738,8 @@ function init(){
             };
         })
     ]).then(initialize_uniforms).then(() => {
+
+        let sim_res = data.uniforms.sim_res.value[0];  // TODO: update
 
         // setup buffers
         let vertex_buffer = create_buffer(new Float32Array(screen_mesh[0].flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
