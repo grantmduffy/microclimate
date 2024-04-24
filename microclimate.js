@@ -48,7 +48,6 @@ const render_height = 480;
 let M_camera = new Float32Array(16);
 let M_camera_inv = new Float32Array(16);
 let M_perspective = new Float32Array(16);
-let M_sun = new Float32Array(16);
 let camera_pos = [0.5, 0.5, 0.25];
 let camera_rot = [45, 0];
 let near = 0.03
@@ -484,10 +483,12 @@ function init(){
 
     let loop = function(){
 
+        set_sun_matrix(data.uniforms.M_sun.value);
         set_uniforms();
 
         gl.disable(gl.BLEND);
         gl.enable(gl.DEPTH_TEST);
+
         // sim program
         gl.useProgram(data.programs.sim.program);
         gl.viewport(0, 0, data.uniforms.sim_res.value[1], data.uniforms.sim_res.value[0]);
@@ -508,9 +509,6 @@ function init(){
             gl.activeTexture(gl.TEXTURE0 + i);
             gl.bindTexture(gl.TEXTURE_2D, data.textures[i].in_tex);
 
-            // set in texture uniforms for sim_program
-            gl.uniform1i(gl.getUniformLocation(data.programs.sim.program, data.textures[i].name), i);
-
             // set out textures for sim_fbo
             gl.framebufferTexture2D(
                 gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i,
@@ -520,8 +518,6 @@ function init(){
         }
         
         // set uniforms
-        gl.uniform1i(gl.getUniformLocation(data.programs.sim.program, 'light_t'), 6);
-        gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.sim.program, 'M_sun'), gl.FALSE, M_sun);
         
         // draw
         gl.clearColor(0, 0, 0, 0);
@@ -530,15 +526,10 @@ function init(){
 
         
         // draw sun layer
-        set_sun_matrix(M_sun);
-        // canvas.width = sim_res;
-        // canvas.height = sim_res;
-
         gl.useProgram(data.programs.sun.program);
         for (var i = 0; i < data.textures.length; i++){
             gl.uniform1i(gl.getUniformLocation(data.programs.sun.program, data.textures[i].name), i);
         }
-        gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.sun.program, 'M_sun'), gl.FALSE, M_sun);
         gl.uniform3fv(gl.getUniformLocation(data.programs.sun.program, 'sun_dir'), sun_dir)
         if (render_mode_el.value != 'sun'){
             gl.bindFramebuffer(gl.FRAMEBUFFER, data.fbos.sun_fbo);
@@ -568,8 +559,6 @@ function init(){
             }
             gl.uniform1i(gl.getUniformLocation(data.programs.render2d.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
             gl.uniform3fv(gl.getUniformLocation(data.programs.render2d.program, 'sun_dir'), sun_dir)
-            gl.uniform1i(gl.getUniformLocation(data.programs.render2d.program, 'light_t'), 6);
-            gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.render2d.program, 'M_sun'), gl.FALSE, M_sun);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             gl.clearColor(0, 0, 0, 1);
             gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
@@ -591,7 +580,6 @@ function init(){
         } else if (render_mode_el.value == '3d'){
 
             // drawing 3D
-            // mat4.lookAt(M_camera, camera_pos, [0.5, 0.5, 0], [0, 0, 1]);
             mat4.identity(M_camera);
             mat4.rotateX(M_camera, M_camera, -camera_rot[0] * PI / 180);
             mat4.rotateZ(M_camera, M_camera, -camera_rot[1] * PI / 180);
@@ -616,8 +604,6 @@ function init(){
             gl.uniform1i(gl.getUniformLocation(data.programs.render3d.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
             gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.render3d.program, 'M_camera'), gl.FALSE, M_camera);
             gl.uniform3fv(gl.getUniformLocation(data.programs.render3d.program, 'sun_dir'), sun_dir)
-            gl.uniform1i(gl.getUniformLocation(data.programs.render3d.program, 'light_t'), 6);
-            gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.render3d.program, 'M_sun'), gl.FALSE, M_sun);
             gl.uniform3f(gl.getUniformLocation(data.programs.render3d.program, 'camera_pos'), camera_pos[0], camera_pos[1], camera_pos[2]);
             for (var i = 0; i < data.textures.length; i++){
                 gl.uniform1i(gl.getUniformLocation(data.programs.render3d.program, data.textures[i].name), i);
@@ -632,8 +618,6 @@ function init(){
             gl.uniform1i(gl.getUniformLocation(data.programs.water.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
             gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.water.program, 'M_camera'), gl.FALSE, M_camera);
             gl.uniform3fv(gl.getUniformLocation(data.programs.water.program, 'sun_dir'), sun_dir)
-            gl.uniform1i(gl.getUniformLocation(data.programs.water.program, 'light_t'), 6);
-            gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.water.program, 'M_sun'), gl.FALSE, M_sun);
             gl.uniform3f(gl.getUniformLocation(data.programs.water.program, 'camera_pos'), camera_pos[0], camera_pos[1], camera_pos[2]);
             for (var i = 0; i < data.textures.length; i++){
                 gl.uniform1i(gl.getUniformLocation(data.programs.water.program, data.textures[i].name), i);
@@ -654,7 +638,6 @@ function init(){
             gl.uniform1i(gl.getUniformLocation(data.programs.cloud_plane.program, 'cloud_mode'), cloud_mode_options.indexOf(cloud_mode_el.value));
             gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.cloud_plane.program, 'M_camera'), gl.FALSE, M_camera);
             gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.cloud_plane.program, 'M_camera_inv'), gl.FALSE, M_camera_inv);
-            gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.cloud_plane.program, 'M_sun'), gl.FALSE, M_sun);
             gl.uniform1f(gl.getUniformLocation(data.programs.cloud_plane.program, 'cloud_density'), 200 / n_cloud_planes);
             gl.uniform1f(gl.getUniformLocation(data.programs.cloud_plane.program, 'near'), near);
             gl.uniform1f(gl.getUniformLocation(data.programs.cloud_plane.program, 'far'), far);
@@ -663,7 +646,6 @@ function init(){
             for (var i = 0; i < data.textures.length; i++){
                 gl.uniform1i(gl.getUniformLocation(data.programs.cloud_plane.program, data.textures[i].name), i);
             }
-            gl.uniform1i(gl.getUniformLocation(data.programs.cloud_plane.program, 'light_t'), 6);
             gl.drawArrays(gl.TRIANGLES, 0, 3 * cloud_planes.length);
         } else if (render_mode_el.value == 'sun'){
             
