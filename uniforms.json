@@ -36,7 +36,8 @@
         "type": "mat4"
     },
     "sun_dir": {
-        "type": "vec3"
+        "type": "vec3",
+        "value": [3, 3, 1]
     },
     "view_mode": {
         "type": "int",
@@ -89,11 +90,16 @@
     "M_camera": {
         "type": "mat4"
     },
+    "camera_pos": {
+        "type": "vec3",
+        "value": [0.5, 0.5, 0.25]
+    },
     "M_camera_inv": {
         "type": "mat4"
     },
     "cloud_density": {
-        "type": "float"
+        "type": "float",
+        "value": 0.5
     },
     "near": {
         "type": "float",

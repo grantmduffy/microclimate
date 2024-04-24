@@ -48,7 +48,6 @@ const render_height = 480;
 let M_camera = new Float32Array(16);
 let M_camera_inv = new Float32Array(16);
 let M_perspective = new Float32Array(16);
-let camera_pos = [0.5, 0.5, 0.25];
 let camera_rot = [45, 0];
 let near = 0.03
 let far = 1.5
@@ -59,8 +58,6 @@ const vert_speed = 0.001;
 const n_cloud_planes = 400;
 const z_max = 0.3  // max_elev
 const z_min = -0.01
-let sun_dir = [3, 3, 1];
-norm_vect(sun_dir);
 var render_t0 = 0;
 var fps_filtered = 0;
 const fps_filt_const = 0.99;
@@ -121,11 +118,11 @@ function mouse_move(event){
         if (mouse_state.keys == 2){
             // translate camera
             let t = camera_rot[1] * PI / 180;
-            camera_pos[0] -= walk_speed * (mouse_state.vel_x * Math.cos(t) - mouse_state.vel_y * Math.sin(t));
-            camera_pos[1] -= walk_speed * (mouse_state.vel_x * Math.sin(t) + mouse_state.vel_y * Math.cos(t));
+            data.uniforms.camera_pos.value[0] -= walk_speed * (mouse_state.vel_x * Math.cos(t) - mouse_state.vel_y * Math.sin(t));
+            data.uniforms.camera_pos.value[1] -= walk_speed * (mouse_state.vel_x * Math.sin(t) + mouse_state.vel_y * Math.cos(t));
         }
         if (mouse_state.keys == 3){
-            camera_pos[2] -= vert_speed * mouse_state.vel_y;
+            data.uniforms.camera_pos.value[2] -= vert_speed * mouse_state.vel_y;
         }
     
     }
@@ -147,8 +144,8 @@ function get_cursor_point(x, y){
     let uv1 = new Float32Array([x * 2 - 1, y * 2 - 1, 1, 1]);
     let xyz0 = new Float32Array(4);
     let xyz1 = new Float32Array(4);
-    mat4.multiply(xyz0, M_camera_inv, uv0);
-    mat4.multiply(xyz1, M_camera_inv, uv1);
+    mat4.multiply(xyz0, data.uniforms.M_camera_inv.value, uv0);
+    mat4.multiply(xyz1, data.uniforms.M_camera_inv.value, uv1);
     let t = -(xyz0[2] / xyz0[3]) / (xyz1[2] / xyz1[3] - xyz0[2] / xyz0[3]);
     let x_out = xyz0[0] / xyz0[3] + t * (xyz1[0] / xyz1[3] - xyz0[0] / xyz0[3]);
     let y_out = xyz0[1] / xyz0[3] + t * (xyz1[1] / xyz1[3] - xyz0[1] / xyz0[3]);
@@ -228,8 +225,8 @@ function set_sun_matrix(M){
     M[7] = 0;
 
     // row 2
-    M[8] = -sun_dir[0] / sun_dir[2];
-    M[9] = -sun_dir[1] / sun_dir[2];
+    M[8] = -data.uniforms.sun_dir.value[0] / data.uniforms.sun_dir.value[2];
+    M[9] = -data.uniforms.sun_dir.value[1] / data.uniforms.sun_dir.value[2];
     M[10] = -2 / (z_max - z_min);
     M[11] = 0;
 
@@ -239,6 +236,17 @@ function set_sun_matrix(M){
     M[14] = (z_max + z_min) / (z_max - z_min);
     M[15] = 1;
 
+}
+
+
+function set_camera_matrix(M_camera, M_camera_inv, camera_pos){
+    mat4.identity(M_camera);
+    mat4.rotateX(M_camera, M_camera, -camera_rot[0] * PI / 180);
+    mat4.rotateZ(M_camera, M_camera, -camera_rot[1] * PI / 180);
+    mat4.translate(M_camera, M_camera, invert_vect(camera_pos));
+    mat4.perspective(M_perspective, 45 * PI / 180, render_width / render_height, near, far);
+    mat4.multiply(M_camera, M_perspective, M_camera);
+    mat4.invert(M_camera_inv, M_camera);
 }
 
 
@@ -484,6 +492,12 @@ function init(){
     let loop = function(){
 
         set_sun_matrix(data.uniforms.M_sun.value);
+        set_camera_matrix(
+            data.uniforms.M_camera.value, 
+            data.uniforms.M_camera_inv.value,
+            data.uniforms.camera_pos.value
+        );
+        norm_vect(data.uniforms.sun_dir.value);
         set_uniforms();
 
         gl.disable(gl.BLEND);
@@ -517,8 +531,6 @@ function init(){
 
         }
         
-        // set uniforms
-        
         // draw
         gl.clearColor(0, 0, 0, 0);
         gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
@@ -527,10 +539,6 @@ function init(){
         
         // draw sun layer
         gl.useProgram(data.programs.sun.program);
-        for (var i = 0; i < data.textures.length; i++){
-            gl.uniform1i(gl.getUniformLocation(data.programs.sun.program, data.textures[i].name), i);
-        }
-        gl.uniform3fv(gl.getUniformLocation(data.programs.sun.program, 'sun_dir'), sun_dir)
         if (render_mode_el.value != 'sun'){
             gl.bindFramebuffer(gl.FRAMEBUFFER, data.fbos.sun_fbo);
         } else {
@@ -554,11 +562,6 @@ function init(){
             
             // draw render2d
             gl.useProgram(data.programs.render2d.program);
-            for (var i = 0; i < data.textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(render2d_program, data.textures[i].name), i);
-            }
-            gl.uniform1i(gl.getUniformLocation(data.programs.render2d.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
-            gl.uniform3fv(gl.getUniformLocation(data.programs.render2d.program, 'sun_dir'), sun_dir)
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             gl.clearColor(0, 0, 0, 1);
             gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
@@ -573,21 +576,10 @@ function init(){
                 gl.FLOAT, gl.FALSE,
                 3 * 4, 0
             );
-            for (var i = 0; i < data.textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(data.programs.arrow.program, data.textures[i].name), i);
-            }
             gl.drawArrays(gl.LINES, 0, arrows.length * 2);
         } else if (render_mode_el.value == '3d'){
 
             // drawing 3D
-            mat4.identity(M_camera);
-            mat4.rotateX(M_camera, M_camera, -camera_rot[0] * PI / 180);
-            mat4.rotateZ(M_camera, M_camera, -camera_rot[1] * PI / 180);
-            mat4.translate(M_camera, M_camera, invert_vect(camera_pos));
-            mat4.perspective(M_perspective, 45 * PI / 180, render_width / render_height, near, far);
-            mat4.multiply(M_camera, M_perspective, M_camera);
-            mat4.invert(M_camera_inv, M_camera);
-            
             canvas.width = render_width;
             canvas.height = render_height;
 
@@ -601,13 +593,6 @@ function init(){
                 gl.FLOAT, gl.FALSE,
                 2 * 4, 0
             );
-            gl.uniform1i(gl.getUniformLocation(data.programs.render3d.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
-            gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.render3d.program, 'M_camera'), gl.FALSE, M_camera);
-            gl.uniform3fv(gl.getUniformLocation(data.programs.render3d.program, 'sun_dir'), sun_dir)
-            gl.uniform3f(gl.getUniformLocation(data.programs.render3d.program, 'camera_pos'), camera_pos[0], camera_pos[1], camera_pos[2]);
-            for (var i = 0; i < data.textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(data.programs.render3d.program, data.textures[i].name), i);
-            }
             gl.clearColor(191/255, 240/255, 1, 1);
             gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
             gl.drawArrays(gl.TRIANGLES, 0, grid_mesh.length * 3);
@@ -615,13 +600,6 @@ function init(){
             // draw water
             gl.useProgram(data.programs.water.program);
             gl.enable(gl.BLEND);
-            gl.uniform1i(gl.getUniformLocation(data.programs.water.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
-            gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.water.program, 'M_camera'), gl.FALSE, M_camera);
-            gl.uniform3fv(gl.getUniformLocation(data.programs.water.program, 'sun_dir'), sun_dir)
-            gl.uniform3f(gl.getUniformLocation(data.programs.water.program, 'camera_pos'), camera_pos[0], camera_pos[1], camera_pos[2]);
-            for (var i = 0; i < data.textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(data.programs.water.program, data.textures[i].name), i);
-            }
             gl.drawArrays(gl.TRIANGLES, 0, grid_mesh.length * 3);
 
 
@@ -634,18 +612,6 @@ function init(){
                 gl.FLOAT, gl.FALSE,
                 3 * 4, 0
             );
-            gl.uniform1i(gl.getUniformLocation(data.programs.cloud_plane.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
-            gl.uniform1i(gl.getUniformLocation(data.programs.cloud_plane.program, 'cloud_mode'), cloud_mode_options.indexOf(cloud_mode_el.value));
-            gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.cloud_plane.program, 'M_camera'), gl.FALSE, M_camera);
-            gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.cloud_plane.program, 'M_camera_inv'), gl.FALSE, M_camera_inv);
-            gl.uniform1f(gl.getUniformLocation(data.programs.cloud_plane.program, 'cloud_density'), 200 / n_cloud_planes);
-            gl.uniform1f(gl.getUniformLocation(data.programs.cloud_plane.program, 'near'), near);
-            gl.uniform1f(gl.getUniformLocation(data.programs.cloud_plane.program, 'far'), far);
-            gl.uniform3f(gl.getUniformLocation(data.programs.cloud_plane.program, 'camera_pos'), camera_pos[0], camera_pos[1], camera_pos[2]);
-            gl.uniform3fv(gl.getUniformLocation(data.programs.cloud_plane.program, 'sun_dir'), sun_dir);
-            for (var i = 0; i < data.textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(data.programs.cloud_plane.program, data.textures[i].name), i);
-            }
             gl.drawArrays(gl.TRIANGLES, 0, 3 * cloud_planes.length);
         } else if (render_mode_el.value == 'sun'){
             
