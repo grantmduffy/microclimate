@@ -134,6 +134,14 @@ function mouse_move(event){
     
     }
 
+    data.uniforms.mouse_pos.value[0] = mouse_state.x;
+    data.uniforms.mouse_pos.value[1] = mouse_state.y;
+    data.uniforms.cursor_pos.value[0] = mouse_state.physical_x;
+    data.uniforms.cursor_pos.value[1] = mouse_state.physical_y;
+    data.uniforms.mouse_btns.value = mouse_state.buttons;
+    data.uniforms.keys.value = mouse_state.keys;
+    data.uniforms.pen_vel.value[0] = mouse_state.physical_vel_x;
+    data.uniforms.pen_vel.value[1] = mouse_state.physical_vel_y;
 
 }
 
@@ -515,15 +523,10 @@ function init(){
         }
         
         // set uniforms
-        gl.uniform2f(gl.getUniformLocation(data.programs.sim.program, 'mouse_pos'), mouse_state.x, mouse_state.y);
-        gl.uniform2f(gl.getUniformLocation(data.programs.sim.program, 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
-        gl.uniform1i(gl.getUniformLocation(data.programs.sim.program, 'mouse_btns'), mouse_state.buttons);
-        gl.uniform1i(gl.getUniformLocation(data.programs.sim.program, 'keys'), mouse_state.keys);
         gl.uniform2f(gl.getUniformLocation(data.programs.sim.program, 'sim_res'), sim_res, sim_res);
         gl.uniform1i(gl.getUniformLocation(data.programs.sim.program, 'pen_type'), pen_type_options.indexOf(pen_type_el.value));
         gl.uniform1f(gl.getUniformLocation(data.programs.sim.program, 'pen_size'), document.getElementById('pen-size').value);
         gl.uniform1f(gl.getUniformLocation(data.programs.sim.program, 'pen_strength'), document.getElementById('pen-strength').value);
-        gl.uniform2f(gl.getUniformLocation(data.programs.sim.program, 'pen_vel'), mouse_state.physical_vel_x, mouse_state.physical_vel_y);
         gl.uniform1i(gl.getUniformLocation(data.programs.sim.program, 'light_t'), 6);
         gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.sim.program, 'M_sun'), gl.FALSE, M_sun);
         
@@ -535,7 +538,6 @@ function init(){
         
         // draw sun layer
         set_sun_matrix(M_sun);
-        // mat4.identity(M_sun);
         canvas.width = sim_res;
         canvas.height = sim_res;
 
@@ -574,9 +576,6 @@ function init(){
             gl.uniform2f(gl.getUniformLocation(data.programs.render2d.program, 'sim_res'), sim_res, sim_res);
             gl.uniform1i(gl.getUniformLocation(data.programs.render2d.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
             gl.uniform1f(gl.getUniformLocation(data.programs.render2d.program, 'pen_size'), document.getElementById('pen-size').value);
-            gl.uniform2f(gl.getUniformLocation(data.programs.render2d.program, 'mouse_pos'), mouse_state.x, mouse_state.y);
-            gl.uniform2f(gl.getUniformLocation(data.programs.render2d.program, 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
-            gl.uniform1i(gl.getUniformLocation(data.programs.render2d.program, 'mouse_btns'), mouse_state.buttons);
             gl.uniform2f(gl.getUniformLocation(data.programs.render2d.program, 'sim_res'), sim_res, sim_res);
             gl.uniform3fv(gl.getUniformLocation(data.programs.render2d.program, 'sun_dir'), sun_dir)
             gl.uniform1i(gl.getUniformLocation(data.programs.render2d.program, 'light_t'), 6);
@@ -627,9 +626,6 @@ function init(){
             gl.uniform2f(gl.getUniformLocation(data.programs.render3d.program, 'sim_res'), sim_res, sim_res);
             gl.uniform1i(gl.getUniformLocation(data.programs.render3d.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
             gl.uniform1f(gl.getUniformLocation(data.programs.render3d.program, 'pen_size'), document.getElementById('pen-size').value);
-            gl.uniform2f(gl.getUniformLocation(data.programs.render3d.program, 'mouse_pos'), mouse_state.x, mouse_state.y);
-            gl.uniform2f(gl.getUniformLocation(data.programs.render3d.program, 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
-            gl.uniform1i(gl.getUniformLocation(data.programs.render3d.program, 'mouse_btns'), mouse_state.buttons);
             gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.render3d.program, 'M_camera'), gl.FALSE, M_camera);
             gl.uniform2f(gl.getUniformLocation(data.programs.render3d.program, 'sim_res'), sim_res, sim_res);
             gl.uniform3fv(gl.getUniformLocation(data.programs.render3d.program, 'sun_dir'), sun_dir)
@@ -649,9 +645,6 @@ function init(){
             gl.uniform2f(gl.getUniformLocation(data.programs.water.program, 'sim_res'), sim_res, sim_res);
             gl.uniform1i(gl.getUniformLocation(data.programs.water.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
             gl.uniform1f(gl.getUniformLocation(data.programs.water.program, 'pen_size'), document.getElementById('pen-size').value);
-            gl.uniform2f(gl.getUniformLocation(data.programs.water.program, 'mouse_pos'), mouse_state.x, mouse_state.y);
-            gl.uniform2f(gl.getUniformLocation(data.programs.water.program, 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
-            gl.uniform1i(gl.getUniformLocation(data.programs.water.program, 'mouse_btns'), mouse_state.buttons);
             gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.water.program, 'M_camera'), gl.FALSE, M_camera);
             gl.uniform2f(gl.getUniformLocation(data.programs.water.program, 'sim_res'), sim_res, sim_res);
             gl.uniform3fv(gl.getUniformLocation(data.programs.water.program, 'sun_dir'), sun_dir)
@@ -677,9 +670,6 @@ function init(){
             gl.uniform2f(gl.getUniformLocation(data.programs.cloud_plane.program, 'sim_res'), sim_res, sim_res);
             gl.uniform1i(gl.getUniformLocation(data.programs.cloud_plane.program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
             gl.uniform1f(gl.getUniformLocation(data.programs.cloud_plane.program, 'pen_size'), document.getElementById('pen-size').value);
-            gl.uniform2f(gl.getUniformLocation(data.programs.cloud_plane.program, 'mouse_pos'), mouse_state.x, mouse_state.y);
-            gl.uniform2f(gl.getUniformLocation(data.programs.cloud_plane.program, 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
-            gl.uniform1i(gl.getUniformLocation(data.programs.cloud_plane.program, 'mouse_btns'), mouse_state.buttons);
             gl.uniform1i(gl.getUniformLocation(data.programs.cloud_plane.program, 'cloud_mode'), cloud_mode_options.indexOf(cloud_mode_el.value));
             gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.cloud_plane.program, 'M_camera'), gl.FALSE, M_camera);
             gl.uniformMatrix4fv(gl.getUniformLocation(data.programs.cloud_plane.program, 'M_camera_inv'), gl.FALSE, M_camera_inv);
@@ -812,7 +802,7 @@ function init(){
         }
         for (const program_name in data.programs){
             for (var i = 0; i < data.textures.length; i++){
-                console.log(program_name, data.textures[i].name);
+                // console.log(program_name, data.textures[i].name);
                 let loc = gl.getUniformLocation(
                     data.programs[program_name].program,
                     data.textures[i].name
