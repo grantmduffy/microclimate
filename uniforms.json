@@ -116,6 +116,13 @@
             "default": [0.12, 0.16, 0.18, 1.0]
         }
     },
+    "sky_color": {
+        "type": "vec4",
+        "input": {
+            "type": "color",
+            "default": [0.74, 0.94, 1.0, 1.0]
+        }
+    },
     "sun_color": {
         "type": "vec4",
         "input": {
@@ -140,5 +147,68 @@
     "light_t": {
         "type": "int",
         "value": 6
+    },
+    "K_flow": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 2,
+            "default": 1.2
+        }
+    },
+    "T_eq_surface": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 2,
+            "default": 1
+        }
+    },
+    "T_eq_shade": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 2,
+            "default": 0.6
+        }
+    },
+    "Tao_surface": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 1000,
+            "default": 100
+        }
+    },
+    "Tao_surface_to_air": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 10000,
+            "default": 3000
+        }
+    },
+    "Tao_air_from_surface": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 500,
+            "default": 100
+        }
+    },
+    "Tao_radiation": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 10,
+            "default": 5
+        }
     }
 }

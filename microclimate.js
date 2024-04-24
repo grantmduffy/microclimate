@@ -593,7 +593,7 @@ function init(){
                 gl.FLOAT, gl.FALSE,
                 2 * 4, 0
             );
-            gl.clearColor(191/255, 240/255, 1, 1);
+            gl.clearColor(...data.uniforms.sky_color.value);
             gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
             gl.drawArrays(gl.TRIANGLES, 0, grid_mesh.length * 3);
 

@@ -15,15 +15,12 @@ precision highp sampler2D;
 #define K_elevation_strength 0.01
 
 // thermal properties, Tao units in frames
-#define T_eq_surface 1.
-#define T_eq_shade 0.6
-#define Tao_surface 100.
-#define Tao_surface_to_air 3000.
-// #define Tao_surface_to_air_water (100000. * Tao_surface_to_air)
-// #define Tao_surface_to_air_water 3000.
-#define lake_depth 0.1
-#define Tao_air_from_surface 100.
-#define Tao_radiation 5.
+uniform float T_eq_surface;
+uniform float T_eq_shade;
+uniform float Tao_surface;
+uniform float Tao_surface_to_air;
+uniform float Tao_air_from_surface;
+uniform float Tao_radiation;
 #define C_surface (Tao_surface_to_air / Tao_air_from_surface)
 #define C_surface_water (C_surface * 100.)
 #define K0 (C_surface / Tao_surface)
@@ -32,10 +29,11 @@ precision highp sampler2D;
 #define Q_in (T_eq_surface * K0)
 #define Q_in_shade (T_eq_shade * K0)
 #define freezing_temp 0.6
+#define lake_depth 0.1
 
 // surface properties
-#define K_flow 1.2
-#define K_flow_glacier 0.05
+uniform float K_flow;
+uniform float K_flow_glacier;
 
 #define z_scale 0.1
 #define water_scale 0.002
@@ -55,10 +53,10 @@ precision highp sampler2D;
 #define rainbow_min 0.743
 #define rainbow_max 0.766
 
-#define ambient_color vec4( 30. / 255.,  40. / 255.,  45. / 255., 1.0)
-#define sun_color     vec4(255. / 255., 255. / 255., 237. / 255., 1.0)
-#define grass_color  vec4(122. / 255., 261. / 255., 112. / 255., 1.0)
-#define water_color   vec4( 66. / 255., 135. / 255., 245. / 255., 1.0)
+uniform vec4 ambient_color;
+uniform vec4 sun_color;
+uniform vec4 grass_color;
+uniform vec4 water_color;
 #define water_transparency 0.2
 
 float rand(vec2 co){
