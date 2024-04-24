@@ -30,764 +30,6 @@ Low/High Precip  | r  |  mid.xy
 
 */
 
-let common_src = `#version 300 es
-precision highp float;
-precision highp int;
-precision highp sampler2D;
-
-#define render_res vec2(640., 480.)
-
-// simulation parameters
-#define K_pressure 0.1
-#define K_pressure_uplift 0.01
-#define K_pressure_uplift_acc 10.
-#define K_pressure_decay 0.999
-#define K_uplift_damping 0.05
-#define K_p_decay .9
-#define K_smooth 1.0
-#define K_elevation_strength 0.01
-
-// thermal properties, Tao units in frames
-#define T_eq_surface 1.
-#define T_eq_shade 0.6
-#define Tao_surface 100.
-#define Tao_surface_to_air 3000.
-// #define Tao_surface_to_air_water (100000. * Tao_surface_to_air)
-// #define Tao_surface_to_air_water 3000.
-#define lake_depth 0.1
-#define Tao_air_from_surface 100.
-#define Tao_radiation 5.
-#define C_surface (Tao_surface_to_air / Tao_air_from_surface)
-#define C_surface_water (C_surface * 100.)
-#define K0 (C_surface / Tao_surface)
-#define K1 (1. / Tao_air_from_surface)
-#define K2 (1. / Tao_radiation)
-#define Q_in (T_eq_surface * K0)
-#define Q_in_shade (T_eq_shade * K0)
-#define freezing_temp 0.6
-
-// surface properties
-#define K_flow 1.2
-#define K_flow_glacier 0.05
-
-#define z_scale 0.1
-#define water_scale 0.002
-#define snow_scale 0.005
-#define floating_ice_thickness 0.001
-
-#define low_elev 0.04
-#define high_elev 0.12
-#define max_elev 0.3
-#define cloud_transparency 0.05
-#define rain_density 100.
-
-#define cloud_threshold 0.6
-#define cloud_sharpness 1.5
-#define precip_threshold 0.8
-#define shoreline_sharpness 1.0
-#define rainbow_min 0.743
-#define rainbow_max 0.766
-
-#define ambient_color vec4( 30. / 255.,  40. / 255.,  45. / 255., 1.0)
-#define sun_color     vec4(255. / 255., 255. / 255., 237. / 255., 1.0)
-#define grass_color  vec4(122. / 255., 261. / 255., 112. / 255., 1.0)
-#define water_color   vec4( 66. / 255., 135. / 255., 245. / 255., 1.0)
-#define water_transparency 0.2
-
-float rand(vec2 co){
-    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
-}
-
-vec2 rand2d(vec2 co){
-    float a = rand(co);
-    return vec2(
-        rand(vec2(co.x, a)),
-        rand(vec2(co.y, a))
-    );
-}
-
-float interp_elev(float z, float v_ground, float v_low, float v_high, float v_max){
-    if (z < low_elev){  // below low clouds
-        return z * (v_low - v_ground) / low_elev + v_ground;
-    } else if (z < high_elev){  // between low and high clouds
-        return (z - low_elev) * (v_high - v_low) / (high_elev - low_elev) + v_low;
-    } else {  // above high clouds
-        return (z - high_elev) * (v_max - v_high) / (max_elev - high_elev) + v_high;
-    }
-}
-
-float interp_rain(float z, float v_ground, float v_low, float v_high, float v_max){
-    float z0 = low_elev / 2.;
-    float z1 = (low_elev + high_elev) / 2.;
-    if (z < z0){  // below low clouds
-        return z * (v_low - v_ground) / z0 + v_ground;
-    } else if (z < z1){  // between low and high clouds
-        return (z - z0) * (v_high - v_low) / (z1 - z0) + v_low;
-    } else {  // above high clouds
-        return (z - z1) * (v_max - v_high) / (high_elev - z1) + v_high;
-    }
-}
-
-float get_cloud_density(float h, float t){
-    return clamp((h - t - cloud_threshold) / (precip_threshold - cloud_threshold), 0., 1.);
-}
-
-float get_precip(float h, float t){
-    return max(h - t - precip_threshold, 0.);
-}
-
-vec4 heatmap(float temp){
-    // 0:   (0, 0, 1) x=0
-    // fl:  (0, 0, 0) x=1
-    // 2fl: (1, 0, 0) x=2
-    // 3fl: (1, 1, 0) x=3
-    // 4fl: (1, 1, 1) x=4
-    float x = temp / freezing_temp;
-    return float(mod(x, 0.25) > 0.01) * vec4(
-        x - 1., 
-        x - 2., 
-        max(1. - x, x - 3.), 
-        1.
-    );
-}
-
-vec3 hsv2rgb(vec3 c){
-    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
-
-vec3 get_rainbow(float cos_angle){
-    float amt = (cos_angle - rainbow_min) / (rainbow_max - rainbow_min);
-    float a = clamp(abs(2. * amt - 1.) - 1., 0., 1.);
-    return mix(
-        hsv2rgb(vec3(clamp(amt, 0., .72), 1., 1.)),
-        vec3(1.),
-        a
-    );
-}
-
-vec4 get_ground_color(float temp){
-    return temp > freezing_temp ? grass_color : vec4(0.5, 0.5, 0.5, 1.);
-}
-
-vec4 get_water_color(float temp, float sunlight, float cos_angle, float depth){
-    vec4 white_color =  mix(ambient_color, sun_color, sunlight);
-    return temp > freezing_temp ? vec4(
-        white_color.rgb * water_color.rgb,
-        ((1. - cos_angle) * (1. - water_transparency) + water_transparency) * clamp(depth * shoreline_sharpness, 0., 1.)
-    ) : white_color;
-}
-
-`;
-
-let sim_vs_src = `
-
-in vec2 vert_pos;
-out vec2 xy;
-
-void main(){
-    gl_Position = vec4(vert_pos, 0., 1.);
-    xy = vert_pos * 0.5 + 0.5;
-}
-
-`;
-
-let sim_fs_src = `
-
-uniform vec2 mouse_pos;
-uniform vec2 cursor_pos;
-uniform int mouse_btns;
-uniform int keys;
-uniform vec2 sim_res;
-uniform float pen_size;
-uniform float pen_strength;
-uniform int pen_type;
-uniform vec2 pen_vel;
-uniform mat4 M_sun;
-
-uniform sampler2D low0_t;
-uniform sampler2D low1_t;
-uniform sampler2D high0_t;
-uniform sampler2D high1_t;
-uniform sampler2D mid_t;
-uniform sampler2D other_t;
-uniform sampler2D light_t;
-
-in vec2 xy;
-layout(location = 0) out vec4 low0_out;
-layout(location = 1) out vec4 low1_out;
-layout(location = 2) out vec4 high0_out;
-layout(location = 3) out vec4 high1_out;
-layout(location = 4) out vec4 mid_out;
-layout(location = 5) out vec4 other_out;
-
-// TODO: rename all variables to correct
-void main(){
-
-    // backward convection
-    vec2 uv_low = texture(low0_t, xy).xy;
-    vec2 uv_high = texture(high0_t, xy).xy;
-    vec4 low0_n = texture(low0_t, xy + (vec2(0., 1.) - uv_low) / sim_res);
-    vec4 low0_s = texture(low0_t, xy + (vec2(0., -1.) - uv_low) / sim_res);
-    vec4 low0_e = texture(low0_t, xy + (vec2(1., 0.) - uv_low) / sim_res);
-    vec4 low0_w = texture(low0_t, xy + (vec2(-1., 0.) - uv_low) / sim_res);
-    vec4 high0_n = texture(high0_t, xy + (vec2(0., 1.) - uv_high) / sim_res);
-    vec4 high0_s = texture(high0_t, xy + (vec2(0., -1.) - uv_high) / sim_res);
-    vec4 high0_e = texture(high0_t, xy + (vec2(1., 0.) - uv_high) / sim_res);
-    vec4 high0_w = texture(high0_t, xy + (vec2(-1., 0.) - uv_high) / sim_res);
-    vec4 low1_n = texture(low1_t, xy + (vec2(0., 1.) - uv_low) / sim_res);
-    vec4 low1_s = texture(low1_t, xy + (vec2(0., -1.) - uv_low) / sim_res);
-    vec4 low1_e = texture(low1_t, xy + (vec2(1., 0.) - uv_low) / sim_res);
-    vec4 low1_w = texture(low1_t, xy + (vec2(-1., 0.) - uv_low) / sim_res);
-    vec4 high1_n = texture(high1_t, xy + (vec2(0., 1.) - uv_high) / sim_res);
-    vec4 high1_s = texture(high1_t, xy + (vec2(0., -1.) - uv_high) / sim_res);
-    vec4 high1_e = texture(high1_t, xy + (vec2(1., 0.) - uv_high) / sim_res);
-    vec4 high1_w = texture(high1_t, xy + (vec2(-1., 0.) - uv_high) / sim_res);
-    vec4 mid_n = texture(mid_t, xy + (vec2(0., K_smooth) - uv_high) / sim_res);
-    vec4 mid_s = texture(mid_t, xy + (vec2(0., -K_smooth) - uv_high) / sim_res);
-    vec4 mid_e = texture(mid_t, xy + (vec2(K_smooth, 0.) - uv_high) / sim_res);
-    vec4 mid_w = texture(mid_t, xy + (vec2(-K_smooth, 0.) - uv_high) / sim_res);
-    vec4 other_n = texture(other_t, xy + (vec2(0., 1.)) / sim_res);
-    vec4 other_s = texture(other_t, xy + (vec2(0., -1.)) / sim_res);
-    vec4 other_e = texture(other_t, xy + (vec2(1., 0.)) / sim_res);
-    vec4 other_w = texture(other_t, xy + (vec2(-1., 0.)) / sim_res);
-    
-    // calculate divergence
-    float div_low = low0_n.y - low0_s.y + low0_e.x - low0_w.x;
-    float div_high = high0_n.y - high0_s.y + high0_e.x - high0_w.x;
-
-    // calculate terrain gradient
-    vec2 terrain_gradient = vec2(
-        other_e.z - other_w.z,
-        other_n.z - other_s.z
-    );
-
-    // calculate uplift from divergence
-    float uplift = texture(mid_t, xy - uv_low / sim_res).w;
-
-    // convection, low and high include uplift, mid is pure 2D
-    low0_out  = texture(low0_t,  xy - uv_low  / sim_res) * clamp(1. + uplift, 0., 1.) 
-              + texture(high0_t, xy - uv_low  / sim_res) * clamp(    -uplift, 0., 1.);
-    low1_out  = texture(low1_t,  xy - uv_low  / sim_res) * clamp(1. + uplift, 0., 1.) 
-              + texture(high1_t, xy - uv_low  / sim_res) * clamp(    -uplift, 0., 1.);
-    high0_out = texture(high0_t, xy - uv_high / sim_res) * clamp(1. - uplift, 0., 1.)
-              + texture(low0_t,  xy - uv_high / sim_res) * clamp(     uplift, 0., 1.);
-    high1_out = texture(high1_t, xy - uv_high / sim_res) * clamp(1. - uplift, 0., 1.)
-              + texture(low1_t,  xy - uv_high / sim_res) * clamp(     uplift, 0., 1.);
-    mid_out = texture(mid_t, xy - (uv_low + uv_high) / sim_res);
-    other_out = texture(other_t, xy);
-    
-    // accumulate pressure
-    low1_out.p += -uplift - div_low + dot(uv_low, terrain_gradient) * K_pressure_uplift_acc;
-    high1_out.p += uplift - div_high;
-    
-    // smooth pressure
-    // TODO: improve filtering, maybe larger window
-    low1_out.p = (low1_out.p + low1_n.p + low1_s.p + low1_e.p + low1_w.p) / 5.;
-    high1_out.p = (high1_out.p + high1_n.p + high1_s.p + high1_e.p + high1_w.p) / 5.;
-    low1_out.p = (1. - K_uplift_damping) * low1_out.p + K_uplift_damping * high1_out.p;
-    high1_out.p = (1. - K_uplift_damping) * high1_out.p + K_uplift_damping * low1_out.p;
-    low1_out.p *= K_pressure_decay;
-    high1_out.p *= K_pressure_decay;
-
-    // decend pressure
-    low0_out.x += (low1_w.p - low1_e.p) * K_pressure;
-    low0_out.y += (low1_s.p - low1_n.p) * K_pressure;
-    high0_out.x += (high1_w.p - high1_e.p) * K_pressure;
-    high0_out.y += (high1_s.p - high1_n.p) * K_pressure;
-    mid_out.w += (low1_out.p - high1_out.p) * K_pressure_uplift;
-    
-    // flow water/ice
-    float temp = interp_elev(other_out.z * z_scale + other_out.w * water_scale, other_out.t, low1_out.t, high1_out.t, 0.);
-    float temp_n = interp_elev(other_n.z * z_scale + other_n.w * water_scale, other_n.t, low1_n.t, high1_n.t, 0.);
-    float temp_s = interp_elev(other_s.z * z_scale + other_s.w * water_scale, other_s.t, low1_n.t, high1_s.t, 0.);
-    float temp_e = interp_elev(other_e.z * z_scale + other_e.w * water_scale, other_e.t, low1_n.t, high1_e.t, 0.);
-    float temp_w = interp_elev(other_w.z * z_scale + other_w.w * water_scale, other_w.t, low1_n.t, high1_w.t, 0.);
-    float elev = water_scale * other_out.w + z_scale * other_out.z;
-    vec4 flux = vec4(
-        ((temp_n > freezing_temp) && (temp > freezing_temp) ? K_flow : K_flow_glacier) * clamp((water_scale * other_n.w + z_scale * other_n.z - elev) / 5., -water_scale * other_out.w / 5., water_scale * other_n.w / 5.) / water_scale,
-        ((temp_s > freezing_temp) && (temp > freezing_temp) ? K_flow : K_flow_glacier) * clamp((water_scale * other_s.w + z_scale * other_s.z - elev) / 5., -water_scale * other_out.w / 5., water_scale * other_s.w / 5.) / water_scale,
-        ((temp_e > freezing_temp) && (temp > freezing_temp) ? K_flow : K_flow_glacier) * clamp((water_scale * other_e.w + z_scale * other_e.z - elev) / 5., -water_scale * other_out.w / 5., water_scale * other_e.w / 5.) / water_scale,
-        ((temp_w > freezing_temp) && (temp > freezing_temp) ? K_flow : K_flow_glacier) * clamp((water_scale * other_w.w + z_scale * other_w.z - elev) / 5., -water_scale * other_out.w / 5., water_scale * other_w.w / 5.) / water_scale
-    );
-    other_out.w += dot(flux, vec4(1.));
-
-    // precipitation
-    mid_out.x = get_precip(low1_out.a, low1_out.t);
-    mid_out.y = get_precip(high1_out.a, high1_out.t);
-    low1_out.a -= mid_out.x;
-    high1_out.a -= mid_out.y;
-    other_out.w += mid_out.x + mid_out.y;
-
-    // handle temperature
-    vec4 xyz = vec4(xy, other_out.z * z_scale, 1.);
-    vec4 sun_coord = M_sun * xyz;
-    vec4 light = texture(light_t, sun_coord.xy / 2. + 0.5);
-    other_out.t += (
-        mix(Q_in_shade, Q_in, (sun_coord.z - light.a > 0.001 ? 0. : light.x))        // heat from sun
-        - other_out.t * K0                                                           // heat lost to radiation
-        - (other_out.t - low1_out.t) * K1                                            // heat lost to air via convection
-    ) / mix(C_surface, C_surface_water, max(other_out.w / lake_depth, 0.));
-    low1_out.t += (other_out.t - low1_out.t) * K1;                        // heat gained from ground
-    high1_out.t -= high1_out.t * K2;                                      // heat lost to radiation
-    vec2 pen_vect = pen_vel * pen_strength;
-    if ((length(cursor_pos - xy) < pen_size) && (mouse_btns == 1) && (keys == 0)){
-        switch (pen_type){
-        case 0:  // all velocity
-            low0_out = vec4(pen_vect, 0., 1.);
-            high0_out = vec4(pen_vect, 0., 1.);
-            break;
-        case 1:  // low velocity
-            low0_out = vec4(pen_vect, 0., 1.);
-            break;
-        case 2:  // high velocity
-            high0_out = vec4(pen_vect, 0., 1.);
-            break;
-        case 3:  // elevation
-            float r = length(cursor_pos - xy) / pen_size;
-            other_out.z += (2. * r * r * r - 3. * r * r + 1.) * pen_strength * K_elevation_strength;
-            // other_out.w += (2. * r * r * r - 3. * r * r + 1.) * pen_strength * K_elevation_strength;
-            break;
-        case 4:  // rain
-            other_out.w += 10. * (2. * r * r * r - 3. * r * r + 1.) * pen_strength * K_elevation_strength;
-            // other_out.w = pen_strength;
-            break;
-        }
-        low1_out.a = 1.;
-    }
-    
-    // clip values to 0-1 
-    other_out.z = clamp(other_out.z, 0., 1.);
-    other_out.w = max(0., other_out.w);
-}
-
-`;
-
-let render2d_vs_src = `
-
-in vec2 vert_pos;
-out vec2 xy;
-out vec3 xyz;
-
-void main(){
-    gl_Position = vec4(vert_pos, .99, 1.);
-    xy = vert_pos * 0.5 + 0.5;
-    xyz = vec3(xy, 0.);
-}
-
-`;
-
-let render2d_fs_src = `
-
-uniform int view_mode;
-uniform sampler2D low0_t;
-uniform sampler2D low1_t;
-uniform sampler2D high0_t;
-uniform sampler2D high1_t;
-uniform sampler2D mid_t;
-uniform sampler2D other_t;
-uniform sampler2D light_t;
-uniform float pen_size;
-uniform vec2 mouse_pos;
-uniform vec2 cursor_pos;
-uniform int mouse_btns;
-uniform vec2 sim_res;
-uniform vec3 sun_dir;
-uniform mat4 M_sun;
-uniform vec2 camera_pos;
-
-in vec2 xy;
-in vec3 xyz;
-out vec4 frag_color;
-
-vec4 low0;
-vec4 low1;
-vec4 high0;
-vec4 high1;
-vec4 mid;
-vec4 other;
-vec4 other_n;
-vec4 other_s;
-vec4 other_e;
-vec4 other_w;
-vec4 light;
-float vel_low;
-float vel_high;
-float pressure;
-float h_low;
-float h_high;
-float uplift;
-float elevation;
-float temp;
-
-void main(){
-    switch (view_mode){
-    case 0:  // low velocity
-        low0 = texture(low0_t, xy);
-        low1 = texture(low1_t, xy);
-        vel_low = length(low0.xy);
-        pressure = low1.p * 10.;
-        h_low = low1.a;
-        frag_color = vec4(pressure, vel_low, h_low, 1.);        
-        break;
-    case 1:  // all velocity
-        low0 = texture(low0_t, xy);
-        low1 = texture(low1_t, xy);
-        high0 = texture(high0_t, xy);
-        high1 = texture(high1_t, xy);
-        mid = texture(mid_t, xy);
-        vel_low = length(low0.xy);
-        vel_high = length(high0.xy);
-        pressure = 0.5 * (low1.p + high1.p) * 10.;
-        frag_color = vec4(pressure, vel_low, vel_high, 1.);
-        break;
-    case 2:  // uplift
-        low1 = texture(low1_t, xy);
-        high1 = texture(high1_t, xy);
-        mid = texture(mid_t, xy);
-        pressure = 0.5 * (low1.p + high1.p) * 10.;
-        uplift = 100. * mid.w;
-        frag_color = vec4(uplift, pressure, -uplift, 1.);
-        break;
-    case 3:  // elevation
-        low0 = texture(low0_t, xy);
-        high0 = texture(high0_t, xy);
-        mid = texture(mid_t, xy);
-        other = texture(other_t, xy);
-        uplift = 100. * mid.w;
-        elevation = other.z;
-        frag_color = vec4(uplift, elevation, -uplift, 1.);
-        break;
-    case 4:  // clouds
-        other = texture(other_t, xy);
-        frag_color = float(mod(other.w, 0.25) > 0.01) * vec4(0., other.w * 0.5, other.w, 1.);
-        break;
-    case 5:  // realistic
-        other = texture(other_t, xy);
-        other_n = texture(other_t, xy + vec2(0., 1.) / sim_res);
-        other_s = texture(other_t, xy + vec2(0., -1.) / sim_res);
-        other_e = texture(other_t, xy + vec2(1., 0.) / sim_res);
-        other_w = texture(other_t, xy + vec2(-1., 0.) / sim_res);
-        low1 = texture(low1_t, xy);
-        high1 = texture(high1_t, xy);
-        vec4 sun_coord = M_sun * vec4(xyz, 1.);
-        light = texture(light_t, sun_coord.xy / 2. + 0.5 + rand2d(sun_coord.xy) / render_res);
-        vec3 norm = normalize(vec3(z_scale * vec2(other_w.z - other_e.z, other_s.z - other_n.z) * sim_res, 1.));
-        float sunlight = sun_coord.z - light.a > 0.001 ? 0. : clamp(dot(norm, sun_dir), 0., 1.) * light.x;
-        temp = interp_elev(z_scale * other.z, other.t, low1.t, high1.t, 0.);
-        frag_color = (sun_color * sunlight + ambient_color * (1. - sunlight)) * get_ground_color(temp);
-        // frag_color = vec4(vec3(float(temp < freezing_temp)), 1.);
-        break;
-    case 6:  // temp
-        other = texture(other_t, xy);
-        low1 = texture(low1_t, xy);
-        high1 = texture(high1_t, xy);
-        temp = interp_elev(z_scale * other.z, other.t, low1.t, high1.t, 0.);
-        frag_color = heatmap(temp);
-        break;
-    }
-    if (abs(length(cursor_pos - xy) - pen_size) < 0.001){
-        frag_color = vec4(1.);
-    }
-}
-
-`;
-
-let arrow_vs_src = `
-
-uniform sampler2D low0_t;
-uniform sampler2D high0_t;
-
-in vec3 vert_pos;
-out vec2 xy;
-
-void main(){
-    vec2 pos = vert_pos.xy;
-    xy = pos * 0.5 + 0.5;
-    float a = vert_pos.z;
-    vec2 uv = texture(low0_t, xy).xy;
-    gl_Position = vec4(pos + a * uv * 0.1, 0., 1.);
-    // gl_Position = vec4(pos, 0., 1.);
-}
-
-`;
-
-let arrow_fs_src = `
-
-in vec2 xy;
-out vec4 frag_color;
-
-void main(){
-    frag_color = vec4(1., 1., 1., 1.);
-}
-
-`;
-
-let render3d_vs_src = `
-
-uniform mat4 M_camera;
-uniform sampler2D other_t;
-
-in vec2 vert_pos;
-out vec3 xyz;
-out vec2 xy;
-
-void main(){
-    xy = vert_pos;
-    vec4 other = texture(other_t, xy);
-    float elevation = other.z * z_scale;
-    xyz = vec3(vert_pos, elevation);
-    gl_Position = M_camera * vec4(xyz, 1.);
-}
-`;
-
-let water_vs_src = `
-
-uniform mat4 M_camera;
-uniform sampler2D other_t;
-uniform sampler2D low1_t;
-uniform sampler2D high1_t;
-
-in vec2 vert_pos;
-out vec3 xyz;
-out vec2 xy;
-
-void main(){
-    xy = vert_pos;
-    vec4 other = texture(other_t, xy);
-    vec4 low1 = texture(low1_t, xy);
-    vec4 high1 = texture(high1_t, xy);
-    float elevation = other.z * z_scale;
-    float temp = interp_elev(elevation, other.t, low1.t, high1.t, 0.);
-    float water_depth = temp > freezing_temp ? other.w * water_scale : min(other.w * snow_scale, other.w * water_scale + floating_ice_thickness);
-    // float water_depth = other.w * water_scale;
-    xyz = vec3(vert_pos, elevation + water_depth);
-    gl_Position = M_camera * vec4(xyz, 1.);
-}
-
-`;
-
-let water_fs_src = `
-uniform vec2 sim_res;
-uniform sampler2D other_t;
-uniform vec3 sun_dir;
-uniform vec3 camera_pos;
-uniform sampler2D light_t;
-uniform mat4 M_sun;
-uniform sampler2D low1_t;
-uniform sampler2D high1_t;
-
-in vec3 xyz;
-in vec2 xy;
-out vec4 frag_color;
-
-void main(){
-    vec4 other = texture(other_t, xy);
-    vec4 other_n = texture(other_t, xy + vec2(0., 1.) / sim_res);
-    vec4 other_s = texture(other_t, xy + vec2(0., -1.) / sim_res);
-    vec4 other_e = texture(other_t, xy + vec2(1., 0.) / sim_res);
-    vec4 other_w = texture(other_t, xy + vec2(-1., 0.) / sim_res);
-    vec4 low1 = texture(low1_t, xy);
-    vec4 high1 = texture(high1_t, xy);
-    vec4 sun_coord = M_sun * vec4(xyz, 1.);
-    vec4 light = texture(light_t, sun_coord.xy / 2. + 0.5 + rand2d(sun_coord.xy) / render_res);
-    vec3 norm = normalize(vec3(z_scale * vec2(other_w.z - other_e.z, other_s.z - other_n.z) * sim_res, 1.));
-    vec3 camera_vec = normalize(camera_pos - xyz);
-    float cos_angle = dot(camera_vec, norm);
-    float sunlight = sun_coord.z - light.a > 0.001 ? 0. : clamp(dot(norm, sun_dir), 0., 1.) * light.x;
-    float temp = interp_elev(xyz.z, other.t, low1.t, high1.t, 0.);
-    // frag_color = get_water_color(temp) * mix(ambient_color, sun_color, sunlight);
-    // frag_color.a = (1. - cos_angle) * (1. - water_transparency) + water_transparency;
-    // frag_color.a *= clamp(other.w * shoreline_sharpness, 0., 1.);
-
-    frag_color = get_water_color(temp, sunlight, cos_angle, other.w);
-}
-
-`;
-
-let cloud_plane_vs_src = `
-
-uniform mat4 M_camera;
-uniform mat4 M_camera_inv;
-uniform float near;
-uniform float far;
-
-in vec3 vert_pos;
-out vec4 xyz;
-
-void main(){
-    // gl_Position = vec4((vert_pos * 2. - 1.) * 0.98, 1.);
-    vec4 xyz_close = M_camera_inv * vec4(vert_pos.xy * 2. - 1., -1., 1.);
-    xyz_close /= xyz_close.w;
-    vec4 xyz_far = M_camera_inv * vec4(vert_pos.xy * 2. - 1., 1., 1.);
-    xyz_far /= xyz_far.w;
-    xyz = vert_pos.z * (xyz_far - xyz_close) + xyz_close;
-    xyz /= xyz.w;
-    gl_Position = M_camera * xyz;
-}
-`;
-
-let cloud_plane_fs_src = `
-
-uniform sampler2D low0_t;
-uniform sampler2D low1_t;
-uniform sampler2D high0_t;
-uniform sampler2D high1_t;
-uniform sampler2D mid_t;
-uniform sampler2D other_t;
-uniform sampler2D light_t;
-uniform int cloud_mode;
-uniform float cloud_density;
-uniform mat4 M_camera_inv;
-uniform mat4 M_sun;
-uniform float near;
-uniform float far;
-uniform vec2 sim_res;
-uniform vec3 camera_pos;
-uniform vec3 sun_dir;
-
-in vec4 xyz;
-out vec4 frag_color;
-
-void main(){
-    vec2 xy = xyz.xy;
-    if (
-               (xyz.x < 0.) 
-            || (xyz.y < 0.) 
-            || (xyz.x > 1.) 
-            || (xyz.y > 1.)
-            || (xyz.z < 0.)
-            || (xyz.z > max_elev)
-        ){
-        discard;
-    }
-    float ground_temp = texture(other_t, xyz.xy).t;
-    float low_temp = texture(low1_t, xyz.xy).t;
-    float high_temp = texture(high1_t, xyz.xy).t;
-    float temp = interp_elev(xyz.z, ground_temp, low_temp, high_temp, 0.);
-    switch (cloud_mode){
-        case 0:  // velocity
-
-            break;
-        case 1:  // uplift
-            break;
-        case 2:  // pressure
-            break;
-        case 3:  // realistic
-            vec4 sun_coord = M_sun * xyz;
-            vec4 light = texture(light_t, sun_coord.xy / 2. + 0.5 + rand2d(sun_coord.xy) / sim_res);
-            float brightness = sun_coord.z > light.a ? 0. : clamp(
-                (xyz.z - light.y) * (1. - light.x) / (light.z - light.y) + light.x, 
-                light.x, 1.
-            );
-            float low_cloud = texture(low1_t, xyz.xy + rand2d(sun_coord.xy) / sim_res).a;
-            float high_cloud = texture(high1_t, xyz.xy + rand2d(sun_coord.xy) / sim_res).a;
-            float cloud = get_cloud_density(interp_elev(
-                xyz.z, 0., low_cloud, high_cloud, 0.
-            ), temp);
-            vec2 precip = texture(mid_t, xyz.xy).xy;
-            precip.x += precip.y;
-            float rain = clamp(rain_density * interp_rain(xyz.z, precip.x, precip.x, precip.y, 0.), 0., 1.);
-            float cos_angle = dot(sun_dir, normalize(camera_pos - xyz.xyz));
-            vec3 light_color = mix(
-                ambient_color.xyz, 
-                sun_color.xyz * mix(
-                    vec3(1.), 
-                    get_rainbow(cos_angle), 
-                    rain * (1. - cloud)
-                ), brightness
-            );
-            frag_color = vec4(
-                light_color,
-                max(cloud, rain)
-            );
-            // frag_color = get_rainbow(cos_angle);
-            break;
-        case 4:  // temp
-            frag_color = heatmap(temp);
-            frag_color.a = 0.03 * float(temp > 0.5);
-        default:
-            break;
-    }
-
-}
-`;
-
-let sun_vs_src = `
-
-uniform mat4 M_sun;
-uniform sampler2D other_t;
-
-in vec2 vert_pos;
-out vec4 xyz;
-out vec4 sun_coord;
-
-void main(){
-    float elevation = texture(other_t, vert_pos).z * z_scale;
-    xyz = vec4(vert_pos, elevation, 1.);
-    sun_coord = M_sun * xyz;
-    gl_Position = sun_coord;
-}
-
-`;
-
-let sun_fs_src = `
-
-uniform sampler2D low1_t;
-uniform sampler2D high1_t;
-uniform sampler2D other_t;
-uniform sampler2D mid_t;
-uniform vec3 sun_dir;
-uniform mat4 M_sun;
-
-#define n_light_samples 80
-#define cloud_start 0.1
-#define cloud_density_sun 1.5
-#define cloud_end_density 0.3
-
-// out vec4 frag_color;
-in vec4 xyz;  // surface point
-in vec4 sun_coord;
-layout(location = 0) out vec4 light_out;
-
-void main(){
-
-    light_out = vec4(1., 0., 0., 0.);
-    for (int i = n_light_samples; i > 0; i--){
-        float z_sample = xyz.z + (max_elev - xyz.z) * float(i) / float(n_light_samples);
-        vec2 xy_sample = xyz.xy + 0.5 * (z_sample - xyz.z) * sun_dir.xy / sun_dir.z;
-        float low_cloud = texture(low1_t, xy_sample).a;
-        float high_cloud = texture(high1_t, xy_sample).a;
-        float ground_temp = texture(other_t, xyz.xy).t;
-        float low_temp = texture(low1_t, xyz.xy + 0.5 * (z_sample - xyz.z) * sun_dir.xy / sun_dir.z).t;
-        float high_temp = texture(high1_t, xy_sample).t;
-        float temp = interp_elev(z_sample, ground_temp, low_temp, high_temp, 0.);
-        float cloud = get_cloud_density(interp_elev(
-            z_sample, 0., low_cloud, high_cloud, 0.
-        ), temp);
-
-        // rain
-        // vec2 precip = texture(mid_t, xy_sample).xy;
-        // precip.x += precip.y;
-        // float rain = clamp(rain_density * interp_rain(z_sample, precip.x, precip.x, precip.y, 0.), 0., 1.);
-        // light_out.x *= (1. - cloud_density_sun * max(cloud, rain) * (max_elev - xyz.z));
-        
-        // no rain
-        light_out.x *= (1. - cloud_density_sun * cloud * (max_elev - xyz.z));
-        
-        // cloud lower edge
-        light_out.y = (cloud > cloud_start) && (light_out.x > cloud_end_density) ? z_sample : light_out.y;
-        
-        // cloud upper edge
-        light_out.z = (cloud > cloud_start) && (light_out.z == 0.) ? z_sample : light_out.z;
-    }
-
-    light_out.a = sun_coord.z;  // for shaddow mapping
-}
-`;
-
-
 var [width, height] = [1, 1];
 let mouse_state = {
     x: 0.5,
@@ -801,17 +43,12 @@ let mouse_state = {
 var canvas = null;
 const fps = 10;
 const K_drag = 100;
-const sim_res = 512;
 const render_width = 640;
 const render_height = 480;
 let M_camera = new Float32Array(16);
 let M_camera_inv = new Float32Array(16);
 let M_perspective = new Float32Array(16);
-let M_sun = new Float32Array(16);
-let camera_pos = [0.5, 0.5, 0.25];
 let camera_rot = [45, 0];
-// let camera_pos = [0.5, 0.5, 2];
-// let camera_rot = [0, 0];
 let near = 0.03
 let far = 1.5
 const PI = 3.14159
@@ -821,11 +58,10 @@ const vert_speed = 0.001;
 const n_cloud_planes = 400;
 const z_max = 0.3  // max_elev
 const z_min = -0.01
-let sun_dir = [3, 3, 1];
-norm_vect(sun_dir);
 var render_t0 = 0;
 var fps_filtered = 0;
 const fps_filt_const = 0.99;
+let data = {};
 
 
 function invert_vect(arr){
@@ -882,15 +118,23 @@ function mouse_move(event){
         if (mouse_state.keys == 2){
             // translate camera
             let t = camera_rot[1] * PI / 180;
-            camera_pos[0] -= walk_speed * (mouse_state.vel_x * Math.cos(t) - mouse_state.vel_y * Math.sin(t));
-            camera_pos[1] -= walk_speed * (mouse_state.vel_x * Math.sin(t) + mouse_state.vel_y * Math.cos(t));
+            data.uniforms.camera_pos.value[0] -= walk_speed * (mouse_state.vel_x * Math.cos(t) - mouse_state.vel_y * Math.sin(t));
+            data.uniforms.camera_pos.value[1] -= walk_speed * (mouse_state.vel_x * Math.sin(t) + mouse_state.vel_y * Math.cos(t));
         }
         if (mouse_state.keys == 3){
-            camera_pos[2] -= vert_speed * mouse_state.vel_y;
+            data.uniforms.camera_pos.value[2] -= vert_speed * mouse_state.vel_y;
         }
     
     }
 
+    data.uniforms.mouse_pos.value[0] = mouse_state.x;
+    data.uniforms.mouse_pos.value[1] = mouse_state.y;
+    data.uniforms.cursor_pos.value[0] = mouse_state.physical_x;
+    data.uniforms.cursor_pos.value[1] = mouse_state.physical_y;
+    data.uniforms.mouse_btns.value = mouse_state.buttons;
+    data.uniforms.keys.value = mouse_state.keys;
+    data.uniforms.pen_vel.value[0] = mouse_state.physical_vel_x;
+    data.uniforms.pen_vel.value[1] = mouse_state.physical_vel_y;
 
 }
 
@@ -900,8 +144,8 @@ function get_cursor_point(x, y){
     let uv1 = new Float32Array([x * 2 - 1, y * 2 - 1, 1, 1]);
     let xyz0 = new Float32Array(4);
     let xyz1 = new Float32Array(4);
-    mat4.multiply(xyz0, M_camera_inv, uv0);
-    mat4.multiply(xyz1, M_camera_inv, uv1);
+    mat4.multiply(xyz0, data.uniforms.M_camera_inv.value, uv0);
+    mat4.multiply(xyz1, data.uniforms.M_camera_inv.value, uv1);
     let t = -(xyz0[2] / xyz0[3]) / (xyz1[2] / xyz1[3] - xyz0[2] / xyz0[3]);
     let x_out = xyz0[0] / xyz0[3] + t * (xyz1[0] / xyz1[3] - xyz0[0] / xyz0[3]);
     let y_out = xyz0[1] / xyz0[3] + t * (xyz1[1] / xyz1[3] - xyz0[1] / xyz0[3]);
@@ -981,19 +225,245 @@ function set_sun_matrix(M){
     M[7] = 0;
 
     // row 2
-    M[8] = -sun_dir[0] / sun_dir[2];
-    M[9] = -sun_dir[1] / sun_dir[2];
+    M[8] = -data.uniforms.sun_dir.value[0] / data.uniforms.sun_dir.value[2];
+    M[9] = -data.uniforms.sun_dir.value[1] / data.uniforms.sun_dir.value[2];
     M[10] = -2 / (z_max - z_min);
     M[11] = 0;
 
     // row 3
-    M[12] = -1
-    M[13] = -1
+    M[12] = -1;
+    M[13] = -1;
     M[14] = (z_max + z_min) / (z_max - z_min);
-    M[15] = 1
+    M[15] = 1;
 
 }
 
+
+function set_camera_matrix(M_camera, M_camera_inv, camera_pos){
+    mat4.identity(M_camera);
+    mat4.rotateX(M_camera, M_camera, -camera_rot[0] * PI / 180);
+    mat4.rotateZ(M_camera, M_camera, -camera_rot[1] * PI / 180);
+    mat4.translate(M_camera, M_camera, invert_vect(camera_pos));
+    mat4.perspective(M_perspective, 45 * PI / 180, render_width / render_height, near, far);
+    mat4.multiply(M_camera, M_perspective, M_camera);
+    mat4.invert(M_camera_inv, M_camera);
+}
+
+
+async function initialize_uniforms(){
+    let inputs_el = document.getElementById('inputs');
+    return load_file('uniforms.json').then((uniforms) => {
+        uniforms = JSON.parse(uniforms);
+        for (let k in uniforms){
+
+            // setup value buffers
+            if (!('value' in uniforms[k])){
+                switch(uniforms[k].type){
+                    case 'bool':
+                        uniforms[k].value = false;
+                        break;
+                    case 'int':
+                        uniforms[k].value = 0;
+                        break;
+                    case 'uint':
+                        uniforms[k].value = 0;
+                        break;
+                    case 'float':
+                        uniforms[k].value = 0.0;
+                        break;
+                    case 'double':
+                        uniforms[k].value = 0.0;
+                        break;
+                    default:
+                        let vec_re = /([biud]?)vec([234]?)$/.exec(uniforms[k].type);
+                        if (vec_re != null){
+                            [_, dtype, n] = vec_re;
+                            n = parseFloat(n);
+                            switch (dtype){
+                                case '':
+                                    uniforms[k].value = new Float32Array(n);
+                                    break;
+                                case 'b':
+                                    uniforms[k].value = new Uint8Array(n);
+                                    break;
+                                case 'i':
+                                    uniforms[k].value = new Int32Array(n);
+                                    break;
+                                case 'u':
+                                    uniforms[k].value = new Uint32Array(n);
+                                    break;
+                                case 'd':
+                                    uniforms[k].value = new Float64Array(n);
+                                    break;
+                            }
+                        }
+                        let mat_re = /(d?)mat([234])x?([234]?)/.exec(uniforms[k].type);
+                        if (mat_re != null){
+                            [_, dtype, n, m] = mat_re;
+                            n = m == '' ? parseInt(n) ** 2: parseInt(n) * parseInt(m);
+                            if (dtype == 'd'){
+                                uniforms[k].value = new Float64Array(n);
+                            } else {
+                                uniforms[k].value = new Float32Array(n);
+                            }
+                        }
+                    
+                }
+            }
+
+            // setup UI for uniforms
+            if ('input' in uniforms[k]){
+                var d = null;
+                switch (uniforms[k].input.type){
+                    case 'range':
+                        d = document.createElement('div');
+                        d.classList.add('row');
+                        l = document.createElement('label');
+                        l.innerText = k + ': ';
+                        l.classList.add('col');
+                        e = document.createElement('input');
+                        e.type = 'range';
+                        e.classList.add('col-8');
+                        if ('min' in uniforms[k].input) e.min = uniforms[k].input.min;
+                        if ('max' in uniforms[k].input) e.max = uniforms[k].input.max;
+                        if ('default' in uniforms[k].input){
+                            e.value = uniforms[k].input.default;
+                            uniforms[k].value = uniforms[k].input.default;
+                        };
+                        e.step = ('step' in uniforms[k].input) ? uniforms[k].input.step : 0.001;
+                        e.addEventListener('input', function(){
+                            this.parentElement.children[0].innerText = k + ': ' + parseFloat(this.value).toFixed(2);
+                            uniforms[k].value = parseFloat(this.value);
+                        });
+                        d.appendChild(l);
+                        d.appendChild(e);
+                        break;
+                    case 'dropdown':
+                        d = document.createElement('div');
+                        d.classList.add('row');
+                        l = document.createElement('label');
+                        l.innerText = k;
+                        l.classList.add('col');
+                        e = document.createElement('select');
+                        e.classList.add('col-8');
+                        for (let i = 0; i < uniforms[k].input.options.length; i++){
+                            o = document.createElement('option');
+                            o.value = i;
+                            o.innerText = uniforms[k].input.options[i];
+                            if ('default' in uniforms[k].input && uniforms[k].input.default == uniforms[k].input.options[i]){
+                                o.selected = true;
+                                uniforms[k].value = i;
+                            };
+                            e.appendChild(o);
+                        }
+                        e.addEventListener('input', function(){
+                            uniforms[k].value = parseInt(this.value);
+                        });
+                        d.appendChild(l);
+                        d.appendChild(e);
+                        break;
+                    case 'color':
+                        d = document.createElement('div');
+                        d.classList.add('row');
+                        l = document.createElement('label');
+                        l.innerText = k;
+                        l.classList.add('col');
+                        e = document.createElement('input');
+                        e.classList.add('col-8');
+                        e.type = 'color';
+                        if ('default' in uniforms[k].input) {
+                            uniforms[k].value = uniforms[k].input.default;
+                            e.value = rgba2hex(uniforms[k].input.default);
+                        }
+                        e.addEventListener('input', function(){
+                            uniforms[k].value = hex2rgba(this.value);
+                        });
+                        d.appendChild(l);
+                        d.appendChild(e);
+                        break;
+                }
+                if (d != null) inputs_el.appendChild(d);
+            }
+        }
+        data.uniforms = uniforms;
+        for (const program_name in data.programs){
+            data.programs[program_name].uniform_locations = {};
+            // console.log(program_name);
+            for (const uniform_name in data.uniforms){
+                let loc = gl.getUniformLocation(
+                    data.programs[program_name].program,
+                    uniform_name
+                );
+                if (loc != null){
+                    // console.log('\t' + uniform_name);
+                    data.programs[program_name].uniform_locations[uniform_name] = loc;
+                }
+            }
+        }
+    });
+}
+
+
+function set_uniforms(){
+    for (program_name in data.programs){
+        gl.useProgram(data.programs[program_name].program);
+        for (uniform_name in data.programs[program_name].uniform_locations){
+            let loc = data.programs[program_name].uniform_locations[uniform_name];
+            let value = data.uniforms[uniform_name].value;
+            switch (data.uniforms[uniform_name].type){
+                case 'bool':
+                case 'int':
+                case 'uint':  
+                case 'sampler2D':      
+                    gl.uniform1i(loc, value);
+                    break;
+                case 'float':
+                case 'double':
+                    gl.uniform1f(loc, value);
+                    break;
+                case 'bvec2':
+                case 'ivec2':
+                case 'uvec2':
+                    gl.uniform2iv(loc, value);
+                    break;
+                case 'vec2':
+                case 'dvec2':
+                    gl.uniform2fv(loc, value);
+                    break;
+                case 'bvec3':
+                case 'ivec3':
+                case 'uvec3':
+                    gl.uniform3iv(loc, value);
+                    break;
+                case 'vec3':
+                case 'dvec3':
+                    gl.uniform3fv(loc, value);
+                    break;
+                case 'bvec4':
+                case 'ivec4':
+                case 'uvec4':
+                    gl.uniform4iv(loc, value);
+                    break;
+                case 'vec4':
+                case 'dvec4':
+                    gl.uniform4fv(loc, value);
+                    break;
+                case 'mat2':
+                case 'dmat2':
+                    gl.uniformMatrix2fv(loc, gl.FALSE, value);
+                    break;
+                case 'dmat3':
+                case 'mat3':
+                    gl.uniformMatrix3fv(loc, gl.FALSE, value);
+                    break;
+                case 'dmat4':
+                case 'mat4':
+                    gl.uniformMatrix4fv(loc, gl.FALSE, value);
+                    break;
+            }
+        }
+    }
+}
 
 function init(){
     canvas = document.getElementById('gl-canvas')
@@ -1018,147 +488,48 @@ function init(){
     for (var i = 0; i < cloud_mode_el.children.length; i++){
         cloud_mode_options.push(cloud_mode_el.children[i].value);
     }
-    
-    // compile shaders
-    let sim_vs = compile_shader(common_src + sim_vs_src, gl.VERTEX_SHADER, '');
-    let sim_fs = compile_shader(common_src + sim_fs_src, gl.FRAGMENT_SHADER, '');
-    let sim_program = link_program(sim_vs, sim_fs);
-    let render2d_vs = compile_shader(common_src + render2d_vs_src, gl.VERTEX_SHADER, '');
-    let render2d_fs = compile_shader(common_src + render2d_fs_src, gl.FRAGMENT_SHADER, '');
-    let render2d_program = link_program(render2d_vs, render2d_fs);
-    let arrow_vs = compile_shader(common_src + arrow_vs_src, gl.VERTEX_SHADER, '');
-    let arrow_fs = compile_shader(common_src + arrow_fs_src, gl.FRAGMENT_SHADER, '');
-    let arrow_program = link_program(arrow_vs, arrow_fs);
-    let render3d_vs = compile_shader(common_src + render3d_vs_src, gl.VERTEX_SHADER, '');
-    let render3d_fs = compile_shader(common_src + render2d_fs_src, gl.FRAGMENT_SHADER, '');
-    let render3d_program = link_program(render3d_vs, render3d_fs);
-    let water_vs = compile_shader(common_src + water_vs_src, gl.VERTEX_SHADER, '');
-    let water_fs = compile_shader(common_src + water_fs_src, gl.FRAGMENT_SHADER, '');
-    let water_program = link_program(water_vs, water_fs);
-    let cloud_plane_vs = compile_shader(common_src + cloud_plane_vs_src, gl.VERTEX_SHADER, '');
-    let cloud_plane_fs = compile_shader(common_src + cloud_plane_fs_src, gl.FRAGMENT_SHADER, '');
-    let cloud_plane_program = link_program(cloud_plane_vs, cloud_plane_fs);
-    let sun_vs = compile_shader(common_src + sun_vs_src, gl.VERTEX_SHADER, '');
-    let sun_fs = compile_shader(common_src + sun_fs_src, gl.FRAGMENT_SHADER, '');
-    let sun_program = link_program(sun_vs, sun_fs);
-
-    // setup buffers
-    let vertex_buffer = create_buffer(new Float32Array(screen_mesh[0].flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
-    let tri_buffer = create_buffer(new Uint16Array(screen_mesh[1].flat()), gl.ELEMENT_ARRAY_BUFFER, gl.STATIC_DRAW);
-    let sim_pos_attr_loc = gl.getAttribLocation(sim_program, 'vert_pos');
-    gl.enableVertexAttribArray(sim_pos_attr_loc);
-    let render2d_pos_attr_loc = gl.getAttribLocation(render2d_program, 'vert_pos');
-    gl.enableVertexAttribArray(render2d_pos_attr_loc);
-    arrows = get_arrows(50);
-    let arrow_buffer = create_buffer(new Float32Array(arrows.flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
-    let arrow_pos_attr_loc = gl.getAttribLocation(arrow_program, 'vert_pos');
-    gl.enableVertexAttribArray(arrow_pos_attr_loc);
-    grid_mesh = get_grid_mesh(sim_res, sim_res);
-    let grid_mesh_buffer = create_buffer(new Float32Array(grid_mesh.flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
-    let grid_mesh_attr_loc = gl.getAttribLocation(render3d_program, 'vert_pos');  // TODO: for other programs that use grid
-    cloud_planes = get_cloud_planes(n_cloud_planes);
-    let cloud_planes_buffer = create_buffer(new Float32Array(cloud_planes.flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
-    let cloud_plane_pos_attr_loc = gl.getAttribLocation(cloud_plane_program, 'vert_pos');
-
-
-    // textures
-    let sim_fbo = gl.createFramebuffer();
-    let sim_depthbuffer = gl.createRenderbuffer();
-    let tex_names = ['low0_t', 'low1_t', 'high0_t', 'high1_t', 'mid_t', 'other_t'];
-    let tex_defaults = [
-        [0.3, 0, 0, 0],  // low0 wind [0.3, 0.3] 
-        [0, 1, 0, 0],    // low1 surface temp 1
-        [0.3, 0, 0, 0],  // high0
-        [0, 0.5, 0, 0],  // high1
-        [0, 1, 0, 0],    // other temp 1
-        [0, 0, 0, 0]     // light
-    ];
-    let textures = [];
-    for (var i = 0; i < tex_names.length; i++){
-        textures.push({
-            'name': tex_names[i],
-            'in_tex': create_texture(sim_res, sim_res, tex_defaults[i], i, 'tile'),
-            'out_tex': create_texture(sim_res, sim_res, tex_defaults[i], i, 'tile')
-        });
-    }
-    
-    // setup fbo
-    gl.bindRenderbuffer(gl.RENDERBUFFER, sim_depthbuffer);
-    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, sim_res, sim_res);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, sim_fbo);
-    gl.drawBuffers([
-        gl.COLOR_ATTACHMENT0,
-        gl.COLOR_ATTACHMENT1,
-        gl.COLOR_ATTACHMENT2,
-        gl.COLOR_ATTACHMENT3,
-        gl.COLOR_ATTACHMENT4,
-        gl.COLOR_ATTACHMENT5,
-        // gl.COLOR_ATTACHMENT6,
-        // gl.COLOR_ATTACHMENT7,
-    ]);
-    
-    let sun_fbo = gl.createFramebuffer();
-    let sun_depthbuffer = gl.createRenderbuffer();
-    let sun_tex = create_texture(sim_res, sim_res, [1, 1, 1, 1], 6, 'tile');
-    gl.bindRenderbuffer(gl.RENDERBUFFER, sun_depthbuffer);
-    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, sim_res, sim_res);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, sun_fbo);
-    gl.drawBuffers([
-        gl.COLOR_ATTACHMENT0
-    ]);
-    gl.framebufferTexture2D(
-        gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
-        gl.TEXTURE_2D, sun_tex, 0
-    );
-    gl.activeTexture(gl.TEXTURE0 + 6);
-    gl.bindTexture(gl.TEXTURE_2D, sun_tex);
 
     let loop = function(){
+
+        set_sun_matrix(data.uniforms.M_sun.value);
+        set_camera_matrix(
+            data.uniforms.M_camera.value, 
+            data.uniforms.M_camera_inv.value,
+            data.uniforms.camera_pos.value
+        );
+        norm_vect(data.uniforms.sun_dir.value);
+        set_uniforms();
+
         gl.disable(gl.BLEND);
         gl.enable(gl.DEPTH_TEST);
+
         // sim program
-        gl.useProgram(sim_program);
-        gl.viewport(0, 0, sim_res, sim_res);
-        gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, tri_buffer);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, sim_fbo);
+        gl.useProgram(data.programs.sim.program);
+        gl.viewport(0, 0, data.uniforms.sim_res.value[1], data.uniforms.sim_res.value[0]);
+        gl.bindBuffer(gl.ARRAY_BUFFER, data.buffers.vertex_buffer);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, data.buffers.tri_buffer);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, data.fbos.sim_fbo);
         gl.vertexAttribPointer(
-            render2d_pos_attr_loc, 2,
+            data.programs.render2d.pos_attr_loc, 2,
             gl.FLOAT, gl.FALSE,
             2 * 4, 0
         );
-        for (var i = 0; i < textures.length; i++){
+        for (var i = 0; i < data.textures.length; i++){
 
             // swap textures
-            [textures[i].in_tex, textures[i].out_tex] = [textures[i].out_tex, textures[i].in_tex];
+            [data.textures[i].in_tex, data.textures[i].out_tex] = [data.textures[i].out_tex, data.textures[i].in_tex];
 
             // set active in textures (for all programs)
             gl.activeTexture(gl.TEXTURE0 + i);
-            gl.bindTexture(gl.TEXTURE_2D, textures[i].in_tex);
-
-            // set in texture uniforms for sim_program
-            gl.uniform1i(gl.getUniformLocation(sim_program, textures[i].name), i);
+            gl.bindTexture(gl.TEXTURE_2D, data.textures[i].in_tex);
 
             // set out textures for sim_fbo
             gl.framebufferTexture2D(
                 gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i,
-                gl.TEXTURE_2D, textures[i].out_tex, 0
+                gl.TEXTURE_2D, data.textures[i].out_tex, 0
             );
 
         }
-        
-        // set uniforms
-        gl.uniform2f(gl.getUniformLocation(sim_program, 'mouse_pos'), mouse_state.x, mouse_state.y);
-        gl.uniform2f(gl.getUniformLocation(sim_program, 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
-        gl.uniform1i(gl.getUniformLocation(sim_program, 'mouse_btns'), mouse_state.buttons);
-        gl.uniform1i(gl.getUniformLocation(sim_program, 'keys'), mouse_state.keys);
-        gl.uniform2f(gl.getUniformLocation(sim_program, 'sim_res'), sim_res, sim_res);
-        gl.uniform1i(gl.getUniformLocation(sim_program, 'pen_type'), pen_type_options.indexOf(pen_type_el.value));
-        gl.uniform1f(gl.getUniformLocation(sim_program, 'pen_size'), document.getElementById('pen-size').value);
-        gl.uniform1f(gl.getUniformLocation(sim_program, 'pen_strength'), document.getElementById('pen-strength').value);
-        gl.uniform2f(gl.getUniformLocation(sim_program, 'pen_vel'), mouse_state.physical_vel_x, mouse_state.physical_vel_y);
-        gl.uniform1i(gl.getUniformLocation(sim_program, 'light_t'), 6);
-        gl.uniformMatrix4fv(gl.getUniformLocation(sim_program, 'M_sun'), gl.FALSE, M_sun);
         
         // draw
         gl.clearColor(0, 0, 0, 0);
@@ -1167,26 +538,16 @@ function init(){
 
         
         // draw sun layer
-        set_sun_matrix(M_sun);
-        // mat4.identity(M_sun);
-        canvas.width = sim_res;
-        canvas.height = sim_res;
-
-        gl.useProgram(sun_program);
-        for (var i = 0; i < textures.length; i++){
-            gl.uniform1i(gl.getUniformLocation(sun_program, textures[i].name), i);
-        }
-        gl.uniformMatrix4fv(gl.getUniformLocation(sun_program, 'M_sun'), gl.FALSE, M_sun);
-        gl.uniform3fv(gl.getUniformLocation(sun_program, 'sun_dir'), sun_dir)
+        gl.useProgram(data.programs.sun.program);
         if (render_mode_el.value != 'sun'){
-            gl.bindFramebuffer(gl.FRAMEBUFFER, sun_fbo);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, data.fbos.sun_fbo);
         } else {
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         }
-        gl.bindBuffer(gl.ARRAY_BUFFER, grid_mesh_buffer);
+        gl.bindBuffer(gl.ARRAY_BUFFER, data.buffers.grid_mesh_buffer);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
         gl.vertexAttribPointer(
-            grid_mesh_attr_loc, 2,
+            data.programs.sun.pos_attr_loc, 2,
             gl.FLOAT, gl.FALSE,
             2 * 4, 0
         );
@@ -1196,137 +557,61 @@ function init(){
 
         if (render_mode_el.value == '2d'){
 
-            canvas.width = sim_res;
-            canvas.height = sim_res;
+            canvas.width = data.uniforms.sim_res.value[1];
+            canvas.height = data.uniforms.sim_res.value[0];
             
             // draw render2d
-            gl.useProgram(render2d_program);
-            for (var i = 0; i < textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(render2d_program, textures[i].name), i);
-            }
-            gl.uniform2f(gl.getUniformLocation(render2d_program, 'sim_res'), sim_res, sim_res);
-            gl.uniform1i(gl.getUniformLocation(render2d_program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
-            gl.uniform1f(gl.getUniformLocation(render2d_program, 'pen_size'), document.getElementById('pen-size').value);
-            gl.uniform2f(gl.getUniformLocation(render2d_program, 'mouse_pos'), mouse_state.x, mouse_state.y);
-            gl.uniform2f(gl.getUniformLocation(render2d_program, 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
-            gl.uniform1i(gl.getUniformLocation(render2d_program, 'mouse_btns'), mouse_state.buttons);
-            gl.uniform2f(gl.getUniformLocation(render2d_program, 'sim_res'), sim_res, sim_res);
-            gl.uniform3fv(gl.getUniformLocation(render2d_program, 'sun_dir'), sun_dir)
-            gl.uniform1i(gl.getUniformLocation(render2d_program, 'light_t'), 6);
-            gl.uniformMatrix4fv(gl.getUniformLocation(render2d_program, 'M_sun'), gl.FALSE, M_sun);
+            gl.useProgram(data.programs.render2d.program);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             gl.clearColor(0, 0, 0, 1);
             gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
             gl.drawElements(gl.TRIANGLES, 3 * screen_mesh[1].length, gl.UNSIGNED_SHORT, 0);
 
             // draw arrows
-            gl.useProgram(arrow_program);
-            gl.bindBuffer(gl.ARRAY_BUFFER, arrow_buffer);
+            gl.useProgram(data.programs.arrow.program);
+            gl.bindBuffer(gl.ARRAY_BUFFER, data.buffers.arrow_buffer);
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
             gl.vertexAttribPointer(
-                arrow_pos_attr_loc, 3,
+                data.programs.arrow.pos_attr_loc, 3,
                 gl.FLOAT, gl.FALSE,
                 3 * 4, 0
             );
-            for (var i = 0; i < textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(arrow_program, textures[i].name), i);
-            }
             gl.drawArrays(gl.LINES, 0, arrows.length * 2);
         } else if (render_mode_el.value == '3d'){
 
             // drawing 3D
-            // mat4.lookAt(M_camera, camera_pos, [0.5, 0.5, 0], [0, 0, 1]);
-            mat4.identity(M_camera);
-            mat4.rotateX(M_camera, M_camera, -camera_rot[0] * PI / 180);
-            mat4.rotateZ(M_camera, M_camera, -camera_rot[1] * PI / 180);
-            mat4.translate(M_camera, M_camera, invert_vect(camera_pos));
-            mat4.perspective(M_perspective, 45 * PI / 180, render_width / render_height, near, far);
-            mat4.multiply(M_camera, M_perspective, M_camera);
-            mat4.invert(M_camera_inv, M_camera);
-            
             canvas.width = render_width;
             canvas.height = render_height;
 
             gl.viewport(0, 0, render_width, render_height);
-            gl.useProgram(render3d_program);
+            gl.useProgram(data.programs.render3d.program);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-            gl.bindBuffer(gl.ARRAY_BUFFER, grid_mesh_buffer);
+            gl.bindBuffer(gl.ARRAY_BUFFER, data.buffers.grid_mesh_buffer);
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
             gl.vertexAttribPointer(
-                grid_mesh_attr_loc, 2,
+                data.programs.render3d.pos_attr_loc, 2,
                 gl.FLOAT, gl.FALSE,
                 2 * 4, 0
             );
-            gl.uniform2f(gl.getUniformLocation(render3d_program, 'sim_res'), sim_res, sim_res);
-            gl.uniform1i(gl.getUniformLocation(render3d_program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
-            gl.uniform1f(gl.getUniformLocation(render3d_program, 'pen_size'), document.getElementById('pen-size').value);
-            gl.uniform2f(gl.getUniformLocation(render3d_program, 'mouse_pos'), mouse_state.x, mouse_state.y);
-            gl.uniform2f(gl.getUniformLocation(render3d_program, 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
-            gl.uniform1i(gl.getUniformLocation(render3d_program, 'mouse_btns'), mouse_state.buttons);
-            gl.uniformMatrix4fv(gl.getUniformLocation(render3d_program, 'M_camera'), gl.FALSE, M_camera);
-            gl.uniform2f(gl.getUniformLocation(render3d_program, 'sim_res'), sim_res, sim_res);
-            gl.uniform3fv(gl.getUniformLocation(render3d_program, 'sun_dir'), sun_dir)
-            gl.uniform1i(gl.getUniformLocation(render3d_program, 'light_t'), 6);
-            gl.uniformMatrix4fv(gl.getUniformLocation(render3d_program, 'M_sun'), gl.FALSE, M_sun);
-            gl.uniform3f(gl.getUniformLocation(render3d_program, 'camera_pos'), camera_pos[0], camera_pos[1], camera_pos[2]);
-            for (var i = 0; i < textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(render3d_program, textures[i].name), i);
-            }
-            gl.clearColor(191/255, 240/255, 1, 1);
+            gl.clearColor(...data.uniforms.sky_color.value);
             gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
             gl.drawArrays(gl.TRIANGLES, 0, grid_mesh.length * 3);
 
             // draw water
-            gl.useProgram(water_program);
+            gl.useProgram(data.programs.water.program);
             gl.enable(gl.BLEND);
-            gl.uniform2f(gl.getUniformLocation(water_program, 'sim_res'), sim_res, sim_res);
-            gl.uniform1i(gl.getUniformLocation(water_program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
-            gl.uniform1f(gl.getUniformLocation(water_program, 'pen_size'), document.getElementById('pen-size').value);
-            gl.uniform2f(gl.getUniformLocation(water_program, 'mouse_pos'), mouse_state.x, mouse_state.y);
-            gl.uniform2f(gl.getUniformLocation(water_program, 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
-            gl.uniform1i(gl.getUniformLocation(water_program, 'mouse_btns'), mouse_state.buttons);
-            gl.uniformMatrix4fv(gl.getUniformLocation(water_program, 'M_camera'), gl.FALSE, M_camera);
-            gl.uniform2f(gl.getUniformLocation(water_program, 'sim_res'), sim_res, sim_res);
-            gl.uniform3fv(gl.getUniformLocation(water_program, 'sun_dir'), sun_dir)
-            gl.uniform1i(gl.getUniformLocation(water_program, 'light_t'), 6);
-            gl.uniformMatrix4fv(gl.getUniformLocation(water_program, 'M_sun'), gl.FALSE, M_sun);
-            gl.uniform3f(gl.getUniformLocation(water_program, 'camera_pos'), camera_pos[0], camera_pos[1], camera_pos[2]);
-            for (var i = 0; i < textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(water_program, textures[i].name), i);
-            }
             gl.drawArrays(gl.TRIANGLES, 0, grid_mesh.length * 3);
 
 
             // draw plane clouds
-            gl.useProgram(cloud_plane_program);
-            // gl.disable(gl.DEPTH_TEST);
-            gl.bindBuffer(gl.ARRAY_BUFFER, cloud_planes_buffer);
+            gl.useProgram(data.programs.cloud_plane.program);
+            gl.bindBuffer(gl.ARRAY_BUFFER, data.buffers.cloud_planes_buffer);
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
             gl.vertexAttribPointer(
-                cloud_plane_pos_attr_loc, 3,
+                data.programs.cloud_plane.pos_attr_loc, 3,
                 gl.FLOAT, gl.FALSE,
                 3 * 4, 0
             );
-            gl.uniform2f(gl.getUniformLocation(cloud_plane_program, 'sim_res'), sim_res, sim_res);
-            gl.uniform1i(gl.getUniformLocation(cloud_plane_program, 'view_mode'), view_mode_options.indexOf(view_mode_el.value));
-            gl.uniform1f(gl.getUniformLocation(cloud_plane_program, 'pen_size'), document.getElementById('pen-size').value);
-            gl.uniform2f(gl.getUniformLocation(cloud_plane_program, 'mouse_pos'), mouse_state.x, mouse_state.y);
-            gl.uniform2f(gl.getUniformLocation(cloud_plane_program, 'cursor_pos'), mouse_state.physical_x, mouse_state.physical_y);
-            gl.uniform1i(gl.getUniformLocation(cloud_plane_program, 'mouse_btns'), mouse_state.buttons);
-            gl.uniform1i(gl.getUniformLocation(cloud_plane_program, 'cloud_mode'), cloud_mode_options.indexOf(cloud_mode_el.value));
-            gl.uniformMatrix4fv(gl.getUniformLocation(cloud_plane_program, 'M_camera'), gl.FALSE, M_camera);
-            gl.uniformMatrix4fv(gl.getUniformLocation(cloud_plane_program, 'M_camera_inv'), gl.FALSE, M_camera_inv);
-            gl.uniformMatrix4fv(gl.getUniformLocation(cloud_plane_program, 'M_sun'), gl.FALSE, M_sun);
-            gl.uniform2f(gl.getUniformLocation(cloud_plane_program, 'sim_res'), sim_res, sim_res);
-            gl.uniform1f(gl.getUniformLocation(cloud_plane_program, 'cloud_density'), 200 / n_cloud_planes);
-            gl.uniform1f(gl.getUniformLocation(cloud_plane_program, 'near'), near);
-            gl.uniform1f(gl.getUniformLocation(cloud_plane_program, 'far'), far);
-            gl.uniform3f(gl.getUniformLocation(cloud_plane_program, 'camera_pos'), camera_pos[0], camera_pos[1], camera_pos[2]);
-            gl.uniform3fv(gl.getUniformLocation(cloud_plane_program, 'sun_dir'), sun_dir);
-            for (var i = 0; i < textures.length; i++){
-                gl.uniform1i(gl.getUniformLocation(cloud_plane_program, textures[i].name), i);
-            }
-            gl.uniform1i(gl.getUniformLocation(cloud_plane_program, 'light_t'), 6);
             gl.drawArrays(gl.TRIANGLES, 0, 3 * cloud_planes.length);
         } else if (render_mode_el.value == 'sun'){
             
@@ -1340,5 +625,160 @@ function init(){
         // setTimeout(() =>{requestAnimationFrame(loop);}, 1000 / fps);
         requestAnimationFrame(loop);  // unlimited fps
     }
-    requestAnimationFrame(loop);
+    
+    // compile shaders
+    data.programs = {};
+    Promise.all([
+        compile_program('glsl/sim_vs.glsl', 'glsl/sim_fs.glsl').then((program) => {
+            let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+            gl.enableVertexAttribArray(pos_attr_loc);    
+            data.programs.sim = {
+                program: program,
+                pos_attr_loc: pos_attr_loc
+            };
+        }),
+        compile_program('glsl/render2d_vs.glsl', 'glsl/render2d_fs.glsl').then((program) => {
+            let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+            gl.enableVertexAttribArray(pos_attr_loc);
+            data.programs.render2d = {
+                program: program,
+                pos_attr_loc: pos_attr_loc
+            };
+        }),
+        compile_program('glsl/arrow_vs.glsl', 'glsl/arrow_fs.glsl').then((program) => {
+            let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+            gl.enableVertexAttribArray(pos_attr_loc);
+            data.programs.arrow = {
+                program: program,
+                pos_attr_loc: pos_attr_loc
+            };
+        }),
+        compile_program('glsl/render3d_vs.glsl', 'glsl/render2d_fs.glsl').then((program) => {
+            let mesh_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+            gl.enableVertexAttribArray(mesh_attr_loc);
+            data.programs.render3d = {
+                program: program,
+                pos_attr_loc: mesh_attr_loc
+            };
+        }),
+        compile_program('glsl/water_vs.glsl', 'glsl/water_fs.glsl').then((program) => {
+            let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+            gl.enableVertexAttribArray(pos_attr_loc);
+            data.programs.water = {
+                program: program,
+                pos_attr_loc: pos_attr_loc
+            };
+        }),
+        compile_program('glsl/cloud_plane_vs.glsl', 'glsl/cloud_plane_fs.glsl').then((program) => {
+            let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+            gl.enableVertexAttribArray(pos_attr_loc);
+            data.programs.cloud_plane = {
+                program: program,
+                pos_attr_loc: pos_attr_loc
+            };
+        }),
+        compile_program('glsl/sun_vs.glsl', 'glsl/sun_fs.glsl').then((program) => {
+            let pos_attr_loc = gl.getAttribLocation(program, 'vert_pos');
+            gl.enableVertexAttribArray(pos_attr_loc);
+            data.programs.sun = {
+                program: program,
+                pos_attr_loc: pos_attr_loc
+            };
+        })
+    ]).then(initialize_uniforms).then(() => {
+
+        let sim_res = data.uniforms.sim_res.value[0];  // TODO: update
+
+        // setup buffers
+        let vertex_buffer = create_buffer(new Float32Array(screen_mesh[0].flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
+        let tri_buffer = create_buffer(new Uint16Array(screen_mesh[1].flat()), gl.ELEMENT_ARRAY_BUFFER, gl.STATIC_DRAW);
+        arrows = get_arrows(50);
+        let arrow_buffer = create_buffer(new Float32Array(arrows.flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
+        grid_mesh = get_grid_mesh(sim_res, sim_res);
+        let grid_mesh_buffer = create_buffer(new Float32Array(grid_mesh.flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
+        cloud_planes = get_cloud_planes(n_cloud_planes);
+        let cloud_planes_buffer = create_buffer(new Float32Array(cloud_planes.flat()), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
+        data.buffers = {
+            vertex_buffer: vertex_buffer,
+            tri_buffer: tri_buffer,
+            arrow_buffer: arrow_buffer,
+            grid_mesh_buffer: grid_mesh_buffer,
+            cloud_planes_buffer: cloud_planes_buffer
+        };
+
+        // textures
+        let sim_fbo = gl.createFramebuffer();
+        let sim_depthbuffer = gl.createRenderbuffer();
+        let tex_names = ['low0_t', 'low1_t', 'high0_t', 'high1_t', 'mid_t', 'other_t'];
+        let tex_defaults = [
+            [0.3, 0, 0, 0],  // low0 wind [0.3, 0.3] 
+            [0, 1, 0, 0],    // low1 surface temp 1
+            [0.3, 0, 0, 0],  // high0
+            [0, 0.5, 0, 0],  // high1
+            [0, 1, 0, 0],    // other temp 1
+            [0, 0, 0, 0]     // light
+        ];
+        data.textures = [];
+        for (var i = 0; i < tex_names.length; i++){
+            data.textures.push({
+                'name': tex_names[i],
+                'in_tex': create_texture(sim_res, sim_res, tex_defaults[i], i, 'tile'),
+                'out_tex': create_texture(sim_res, sim_res, tex_defaults[i], i, 'tile')
+            });
+            data.uniforms[tex_names[i]] = {
+                'type': 'sampler2D',
+                'value': i
+            };
+        }
+        for (const program_name in data.programs){
+            for (var i = 0; i < data.textures.length; i++){
+                // console.log(program_name, data.textures[i].name);
+                let loc = gl.getUniformLocation(
+                    data.programs[program_name].program,
+                    data.textures[i].name
+                );
+                if (loc != null){
+                    data.programs[program_name].uniform_locations[data.textures[i].name] = loc;
+                }
+            }
+        }
+        
+        // setup fbo
+        gl.bindRenderbuffer(gl.RENDERBUFFER, sim_depthbuffer);
+        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, sim_res, sim_res);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, sim_fbo);
+        gl.drawBuffers([
+            gl.COLOR_ATTACHMENT0,
+            gl.COLOR_ATTACHMENT1,
+            gl.COLOR_ATTACHMENT2,
+            gl.COLOR_ATTACHMENT3,
+            gl.COLOR_ATTACHMENT4,
+            gl.COLOR_ATTACHMENT5,
+            // gl.COLOR_ATTACHMENT6,
+            // gl.COLOR_ATTACHMENT7,
+        ]);
+        
+        let sun_fbo = gl.createFramebuffer();
+        let sun_depthbuffer = gl.createRenderbuffer();
+        let sun_tex = create_texture(sim_res, sim_res, [1, 1, 1, 1], 6, 'tile');
+        gl.bindRenderbuffer(gl.RENDERBUFFER, sun_depthbuffer);
+        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, sim_res, sim_res);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, sun_fbo);
+        gl.drawBuffers([
+            gl.COLOR_ATTACHMENT0
+        ]);
+        gl.framebufferTexture2D(
+            gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+            gl.TEXTURE_2D, sun_tex, 0
+        );
+        gl.activeTexture(gl.TEXTURE0 + 6);
+        gl.bindTexture(gl.TEXTURE_2D, sun_tex);
+
+        data.fbos = {
+            sim_fbo: sim_fbo,
+            sun_fbo: sun_fbo
+        };
+        
+        requestAnimationFrame(loop);
+    });
 }
