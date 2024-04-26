@@ -1,0 +1,223 @@
+{
+    "mouse_pos": {
+        "type": "vec2"
+    },
+    "cursor_pos": {
+        "type": "vec2"
+    },
+    "mouse_btns": {
+        "type": "int"
+    },
+    "keys": {
+        "type": "int"
+    },
+    "sim_res": {
+        "type": "vec2",
+        "value": [512, 512]
+    },
+    "pen_type": {
+        "type": "int",
+        "input": {
+            "type": "dropdown",
+            "options": [
+                "all velocity",
+                "low velocity",
+                "high velocity",
+                "elevation",
+                "rain"
+            ],
+            "default": "elevation"
+        }
+    },
+    "pen_vel": {
+        "type": "vec2"
+    },
+    "M_sun": {
+        "type": "mat4"
+    },
+    "sun_dir": {
+        "type": "vec3",
+        "value": [3, 3, 1]
+    },
+    "view_mode": {
+        "type": "int",
+        "input": {
+            "type": "dropdown",
+            "options": [
+                "low velocity",
+                "both velocity",
+                "uplift",
+                "elevation",
+                "clouds",
+                "realistic",
+                "temp"
+            ],
+            "default": "realistic"
+        }
+    },
+    "cloud_mode": {
+        "type": "int",
+        "input": {
+            "type": "dropdown",
+            "options": [
+                "velocity",
+                "uplift",
+                "pressure",
+                "realistic",
+                "temp"
+            ],
+            "default": "realistic"
+        }
+    },
+    "pen_size": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 0.2,
+            "default": 0.1
+        }
+    },
+    "pen_strength": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 2,
+            "default": 1
+        }
+    },
+    "M_camera": {
+        "type": "mat4"
+    },
+    "camera_pos": {
+        "type": "vec3",
+        "value": [0.5, 0.5, 0.25]
+    },
+    "M_camera_inv": {
+        "type": "mat4"
+    },
+    "cloud_density": {
+        "type": "float",
+        "value": 0.5
+    },
+    "near": {
+        "type": "float",
+        "default": 0.03
+    },
+    "far": {
+        "type": "float",
+        "default": 1.5
+    },
+    "ambient_color": {
+        "type": "vec4",
+        "input": {
+            "type": "color",
+            "default": [0.12, 0.16, 0.18, 1.0]
+        }
+    },
+    "sky_color": {
+        "type": "vec4",
+        "input": {
+            "type": "color",
+            "default": [0.74, 0.94, 1.0, 1.0]
+        }
+    },
+    "sun_color": {
+        "type": "vec4",
+        "input": {
+            "type": "color",
+            "default": [1.0, 1.0, 0.93, 1.0]
+        }
+    },
+    "grass_color": {
+        "type": "vec4",
+        "input": {
+            "type": "color",
+            "default": [0.48, 1.0, 0.44, 1.0]
+        }
+    },
+    "water_color": {
+        "type": "vec4",
+        "input": {
+            "type": "color",
+            "default": [0.26, 0.53, 0.96, 1.0]
+        }
+    },
+    "light_t": {
+        "type": "int",
+        "value": 6
+    },
+    "K_flow": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 1.4,
+            "default": 1.2
+        }
+    },
+    "K_flow_glacier": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 1.4,
+            "default": 0.05
+        }
+    },
+    "T_eq_surface": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 2,
+            "default": 1
+        }
+    },
+    "T_eq_shade": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 2,
+            "default": 0.6
+        }
+    },
+    "Tao_surface": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 1000,
+            "default": 100
+        }
+    },
+    "Tao_surface_to_air": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 10000,
+            "default": 3000
+        }
+    },
+    "Tao_air_from_surface": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 500,
+            "default": 100
+        }
+    },
+    "Tao_radiation": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 10,
+            "default": 5
+        }
+    }
+}
