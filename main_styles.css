@@ -1,0 +1,45 @@
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number]{
+    background-color: var(--bs-gray-200);
+    border: none;
+    border-radius: 5px;
+    text-align: center;
+    padding-block: 0;
+    padding-inline: 0;
+    width: 50px;
+}
+
+input[type=number]:focus{
+    background-color: white;
+}
+
+input[type=range]{
+    z-index: 1;
+    padding: 0;
+    margin-left: 10px;
+    margin-right: 10px;
+}
+
+.bubble{
+    background-color: var(--bs-blue) !important;
+    position: absolute;
+    z-index: 2;
+}
+
+.bubble-active{
+    z-index: 3;
+    border: solid !important;
+    background-color: var(--bs-gray-200) !important;
+    border-width: 2px !important;
+    border-color: var(--bs-blue) !important;
+}
+
+.slider{
+    padding: 3px;
+}

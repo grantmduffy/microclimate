@@ -153,8 +153,17 @@
         "input": {
             "type": "range",
             "min": 0,
-            "max": 2,
+            "max": 1.4,
             "default": 1.2
+        }
+    },
+    "K_flow_glacier": {
+        "type": "float",
+        "input": {
+            "type": "range",
+            "min": 0,
+            "max": 1.4,
+            "default": 0.05
         }
     },
     "T_eq_surface": {

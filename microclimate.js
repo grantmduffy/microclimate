@@ -250,6 +250,100 @@ function set_camera_matrix(M_camera, M_camera_inv, camera_pos){
 }
 
 
+function add_slider(parent, k, uniform, n_steps=1000){
+    min = uniform.input.min;
+    max = uniform.input.max;
+    default_value = uniform.input.default;
+    div = document.createElement('div');
+    div.classList.add('row');
+    div.classList.add('slider');
+    l = document.createElement('label');
+    l.innerText = k;
+    l.classList.add('col-3');
+    min_input = document.createElement('input');
+    min_input.type = 'number';
+    min_input.value = min;
+    max_input = document.createElement('input');
+    max_input.type = 'number';
+    max_input.value = max;
+    range_input = document.createElement('input');
+    range_input.type = 'range';
+    range_input.classList.add('col')
+    range_input.min = min;
+    range_input.max = max;
+    range_input.step = (max - min) / n_steps;
+    range_input.value = default_value;
+    bubble = document.createElement('input')
+    bubble.type = 'number';
+    bubble.value = default_value;
+    bubble.classList.add('bubble');
+    hover_func = function(){
+        b = this.parentElement.children[1];
+        r = this.parentElement.children[3];
+        let [min, max] = [r.min, r.max];
+        val = parseFloat(r.value);
+        r.style.zIndex = 4;
+        b.style.top = (this.parentElement.offsetTop + this.parentElement.clientHeight * 1.1 - b.clientHeight / 2) + 'px';
+        b.style.left = ((r.clientWidth - b.clientWidth) * (val - min) / (max - min) + r.offsetLeft) + 'px';
+        b.classList.add('bubble-active');
+    };
+    end_hover_func = function(){
+        b = this.parentElement.children[1];
+        r = this.parentElement.children[3];
+        let [min, max] = [r.min, r.max];
+        val = parseFloat(r.value);
+        r.style.zIndex = 1;
+        b.style.top = (this.parentElement.offsetTop + this.parentElement.clientHeight / 2 - b.clientHeight / 2) + 'px';
+        b.style.left = ((r.clientWidth - b.clientWidth) * (val - min) / (max - min) + r.offsetLeft) + 'px';
+        b.classList.remove('bubble-active');
+    };
+    range_input.addEventListener('input', function(){
+        val = parseFloat(this.value);
+        b = this.parentElement.children[1];
+        r = this.parentElement.children[3];
+        let [min, max] = [r.min, r.max];
+        b.value = val;
+        b.style.left = ((r.clientWidth - b.clientWidth) * (val - min) / (max - min) + r.offsetLeft) + 'px';
+        uniform.value = val;
+    });
+    range_input.addEventListener('mouseenter', hover_func);
+    bubble.addEventListener('mouseenter', hover_func);
+    range_input.addEventListener('mouseout', end_hover_func);
+    bubble.addEventListener('mouseout', end_hover_func);
+    min_input.addEventListener('change', function(){
+        val = parseFloat(this.value);
+        r = this.parentElement.children[3];
+        r.min = val;
+        r.step = (r.max - r.min) / n_steps;
+        r.dispatchEvent(new Event('input'));
+    });
+    max_input.addEventListener('change', function(){
+        val = parseFloat(this.value);
+        r = this.parentElement.children[3];
+        r.max = val;
+        r.step = (r.max - r.min) / n_steps;
+        r.dispatchEvent(new Event('input'));
+    });
+    bubble.addEventListener('change', function(){
+        val = parseFloat(this.value);
+        r = this.parentElement.children[3];
+        r.value = val;
+        r.dispatchEvent(new Event('input'));
+    });
+    div.appendChild(l);
+    div.appendChild(bubble);
+    div.appendChild(min_input);
+    div.appendChild(range_input);
+    div.appendChild(max_input);
+    
+    parent.appendChild(div);
+    // bubble.style.left = ((range_input.clientWidth - bubble.clientWidth) * (default_value - min) / (max - min) + range_input.offsetLeft) + 'px';
+    // bubble.style.top = (range_input.offsetTop + range_input.clientHeight / 2 - bubble.clientHeight / 2) + 'px';
+    range_input.dispatchEvent(new Event('input'));
+    return div;
+}
+
+
 async function initialize_uniforms(){
     let inputs_el = document.getElementById('inputs');
     return load_file('uniforms.json').then((uniforms) => {
@@ -316,36 +410,42 @@ async function initialize_uniforms(){
                 var d = null;
                 switch (uniforms[k].input.type){
                     case 'range':
-                        d = document.createElement('div');
-                        d.classList.add('row');
-                        l = document.createElement('label');
-                        l.innerText = k + ': ';
-                        l.classList.add('col');
-                        e = document.createElement('input');
-                        e.type = 'range';
-                        e.classList.add('col-8');
-                        if ('min' in uniforms[k].input) e.min = uniforms[k].input.min;
-                        if ('max' in uniforms[k].input) e.max = uniforms[k].input.max;
-                        if ('default' in uniforms[k].input){
-                            e.value = uniforms[k].input.default;
-                            uniforms[k].value = uniforms[k].input.default;
-                        };
-                        e.step = ('step' in uniforms[k].input) ? uniforms[k].input.step : 0.001;
-                        e.addEventListener('input', function(){
-                            this.parentElement.children[0].innerText = k + ': ' + parseFloat(this.value).toFixed(2);
-                            uniforms[k].value = parseFloat(this.value);
-                        });
-                        d.appendChild(l);
-                        d.appendChild(e);
+                        add_slider(
+                            inputs_el, 
+                            k,
+                            uniforms[k]
+                        );
+                        // d = document.createElement('div');
+                        // d.classList.add('row');
+                        // l = document.createElement('label');
+                        // l.innerText = k + ': ';
+                        // l.classList.add('col');
+                        // e = document.createElement('input');
+                        // e.type = 'range';
+                        // e.classList.add('col-8');
+                        // if ('min' in uniforms[k].input) e.min = uniforms[k].input.min;
+                        // if ('max' in uniforms[k].input) e.max = uniforms[k].input.max;
+                        // if ('default' in uniforms[k].input){
+                        //     e.value = uniforms[k].input.default;
+                        //     uniforms[k].value = uniforms[k].input.default;
+                        // };
+                        // e.step = ('step' in uniforms[k].input) ? uniforms[k].input.step : 0.001;
+                        // e.addEventListener('input', function(){
+                        //     this.parentElement.children[0].innerText = k + ': ' + parseFloat(this.value).toFixed(2);
+                        //     uniforms[k].value = parseFloat(this.value);
+                        // });
+                        // d.appendChild(l);
+                        // d.appendChild(e);
+                        // inputs_el.appendChild(d);
                         break;
                     case 'dropdown':
                         d = document.createElement('div');
                         d.classList.add('row');
                         l = document.createElement('label');
                         l.innerText = k;
-                        l.classList.add('col');
+                        l.classList.add('col-3');
                         e = document.createElement('select');
-                        e.classList.add('col-8');
+                        e.classList.add('col');
                         for (let i = 0; i < uniforms[k].input.options.length; i++){
                             o = document.createElement('option');
                             o.value = i;
@@ -361,15 +461,16 @@ async function initialize_uniforms(){
                         });
                         d.appendChild(l);
                         d.appendChild(e);
+                        inputs_el.appendChild(d);
                         break;
                     case 'color':
                         d = document.createElement('div');
                         d.classList.add('row');
                         l = document.createElement('label');
                         l.innerText = k;
-                        l.classList.add('col');
+                        l.classList.add('col-3');
                         e = document.createElement('input');
-                        e.classList.add('col-8');
+                        e.classList.add('col');
                         e.type = 'color';
                         if ('default' in uniforms[k].input) {
                             uniforms[k].value = uniforms[k].input.default;
@@ -380,9 +481,9 @@ async function initialize_uniforms(){
                         });
                         d.appendChild(l);
                         d.appendChild(e);
+                        inputs_el.appendChild(d);
                         break;
                 }
-                if (d != null) inputs_el.appendChild(d);
             }
         }
         data.uniforms = uniforms;
