@@ -812,9 +812,9 @@ function init(){
         let sim_depthbuffer = gl.createRenderbuffer();
         let tex_names = ['low0_t', 'low1_t', 'high0_t', 'high1_t', 'mid_t', 'other_t'];
         let tex_defaults = [
-            [0.3, 0, 0, 0],  // low0 wind [0.3, 0.3] 
+            [0, 0, 0, 0],  // low0 wind [0.3, 0.3] 
             [0, 1, 0, 0],    // low1 surface temp 1
-            [0.3, 0, 0, 0],  // high0
+            [0, 0, 0, 0],  // high0
             [0, 0.5, 0, 0],  // high1
             [0, 1, 0, 0],    // other temp 1
             [0, 0, 0, 0]     // light

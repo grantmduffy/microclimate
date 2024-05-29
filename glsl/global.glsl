@@ -5,11 +5,15 @@ precision highp sampler2D;
 #define render_res vec2(640., 480.)
 
 // simulation parameters
-#define K_pressure 0.1
-#define K_pressure_uplift 0.01
+#define delta_t 1. / 512.
+// #define K_pressure 0.01
+uniform float K_pressure;
+// #define K_pressure_uplift 0.01
+uniform float K_pressure_uplift;
 #define K_pressure_uplift_acc 10.
 #define K_pressure_decay 0.999
-#define K_uplift_damping 0.05
+// #define K_uplift_damping 0.05
+uniform float K_uplift_damping;
 #define K_p_decay .9
 #define K_smooth 1.0
 #define K_elevation_strength 0.01

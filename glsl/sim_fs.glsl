@@ -31,39 +31,63 @@ layout(location = 5) out vec4 other_out;
 void main(){
 
     // backward convection
-    vec2 uv_low =  texture(low0_t, xy).xy;
-    vec2 uv_high = texture(high0_t, xy).xy;
-    vec2 uv_mid = (uv_low + uv_high) / 2.;
-    vec4 low0    = texture(low0_t,  xy                         - uv_low   / sim_res);
-    vec4 low0_n  = texture(low0_t,  xy + (vec2( 0.,        1.) - uv_low)  / sim_res);
-    vec4 low0_s  = texture(low0_t,  xy + (vec2( 0.,       -1.) - uv_low)  / sim_res);
-    vec4 low0_e  = texture(low0_t,  xy + (vec2( 1.,        0.) - uv_low)  / sim_res);
-    vec4 low0_w  = texture(low0_t,  xy + (vec2(-1.,        0.) - uv_low)  / sim_res);
-    vec4 high0   = texture(high0_t, xy                         - uv_high  / sim_res);
-    vec4 high0_n = texture(high0_t, xy + (vec2( 0.,        1.) - uv_high) / sim_res);
-    vec4 high0_s = texture(high0_t, xy + (vec2( 0.,       -1.) - uv_high) / sim_res);
-    vec4 high0_e = texture(high0_t, xy + (vec2( 1.,        0.) - uv_high) / sim_res);
-    vec4 high0_w = texture(high0_t, xy + (vec2(-1.,        0.) - uv_high) / sim_res);
-    vec4 low1    = texture(low1_t,  xy                         - uv_low   / sim_res);
-    vec4 low1_n  = texture(low1_t,  xy + (vec2( 0.,        1.) - uv_low)  / sim_res);
-    vec4 low1_s  = texture(low1_t,  xy + (vec2( 0.,       -1.) - uv_low)  / sim_res);
-    vec4 low1_e  = texture(low1_t,  xy + (vec2( 1.,        0.) - uv_low)  / sim_res);
-    vec4 low1_w  = texture(low1_t,  xy + (vec2(-1.,        0.) - uv_low)  / sim_res);
-    vec4 high1   = texture(high1_t, xy                         - uv_high  / sim_res);
-    vec4 high1_n = texture(high1_t, xy + (vec2( 0.,        1.) - uv_high) / sim_res);
-    vec4 high1_s = texture(high1_t, xy + (vec2( 0.,       -1.) - uv_high) / sim_res);
-    vec4 high1_e = texture(high1_t, xy + (vec2( 1.,        0.) - uv_high) / sim_res);
-    vec4 high1_w = texture(high1_t, xy + (vec2(-1.,        0.) - uv_high) / sim_res);
-    vec4 mid     = texture(mid_t,   xy                         - uv_mid   / sim_res);
-    // vec4 mid_n   = texture(mid_t,   xy + (vec2( 0.,  K_smooth) - uv_high) / sim_res);
-    // vec4 mid_s   = texture(mid_t,   xy + (vec2( 0., -K_smooth) - uv_high) / sim_res);
-    // vec4 mid_e   = texture(mid_t,   xy + (vec2( K_smooth,  0.) - uv_high) / sim_res);
-    // vec4 mid_w   = texture(mid_t,   xy + (vec2(-K_smooth,  0.) - uv_high) / sim_res);
-    vec4 other   = texture(other_t, xy                                             );
-    vec4 other_n = texture(other_t, xy + vec2( 0.,         1.)            / sim_res);
-    vec4 other_s = texture(other_t, xy + vec2( 0.,        -1.)            / sim_res);
-    vec4 other_e = texture(other_t, xy + vec2( 1.,         0.)            / sim_res);
-    vec4 other_w = texture(other_t, xy + vec2(-1.,         0.)            / sim_res);
+    vec2 uv_low  = delta_t * texture(low0_t, xy).xy;
+    vec2 uv_high = delta_t * texture(high0_t, xy).xy;
+    vec2 uv_mid  = delta_t * (uv_low + uv_high) / 2.;
+    vec2 northwest = xy + vec2(-1.,  1.) / sim_res;
+    vec2 west      = xy + vec2(-1.,  0.) / sim_res;
+    vec2 southwest = xy + vec2(-1., -1.) / sim_res;
+    vec2 north     = xy + vec2( 0.,  1.) / sim_res;
+    vec2 south     = xy + vec2( 0., -1.) / sim_res;
+    vec2 northeast = xy + vec2( 1.,  1.) / sim_res;
+    vec2 east      = xy + vec2( 1.,  0.) / sim_res;
+    vec2 southeast = xy + vec2( 1., -1.) / sim_res;
+    vec4 low0     = texture(low0_t,  xy        - uv_low);
+    vec4 low0_nw  = texture(low0_t,  northwest - uv_low);
+    vec4 low0_n   = texture(low0_t,  north     - uv_low);
+    vec4 low0_ne  = texture(low0_t,  northeast - uv_low);
+    vec4 low0_sw  = texture(low0_t,  southwest - uv_low);
+    vec4 low0_s   = texture(low0_t,  south     - uv_low);
+    vec4 low0_se  = texture(low0_t,  southeast - uv_low);
+    vec4 low0_e   = texture(low0_t,  east      - uv_low);
+    vec4 low0_w   = texture(low0_t,  west      - uv_low);
+    vec4 high0    = texture(high0_t, xy        - uv_high);
+    vec4 high0_nw = texture(high0_t, northwest - uv_high);
+    vec4 high0_n  = texture(high0_t, north     - uv_high);
+    vec4 high0_ne = texture(high0_t, northeast - uv_high);
+    vec4 high0_sw = texture(high0_t, southwest - uv_high);
+    vec4 high0_s  = texture(high0_t, south     - uv_high);
+    vec4 high0_se = texture(high0_t, southeast - uv_high);
+    vec4 high0_e  = texture(high0_t, east      - uv_high);
+    vec4 high0_w  = texture(high0_t, west      - uv_high);
+    vec4 low1     = texture(low1_t,  xy        - uv_low);
+    vec4 low1_n   = texture(low1_t,  north     - uv_low);
+    vec4 low1_s   = texture(low1_t,  south     - uv_low);
+    vec4 low1_e   = texture(low1_t,  east      - uv_low);
+    vec4 low1_w   = texture(low1_t,  west      - uv_low);
+    vec4 high1    = texture(high1_t, xy        - uv_high);
+    vec4 high1_n  = texture(high1_t, north     - uv_high);
+    vec4 high1_s  = texture(high1_t, south     - uv_high);
+    vec4 high1_e  = texture(high1_t, east      - uv_high);
+    vec4 high1_w  = texture(high1_t, west      - uv_high);
+    vec4 mid      = texture(mid_t,   xy        - uv_mid);
+    vec4 mid_nw   = texture(mid_t,   northwest - uv_mid);
+    vec4 mid_n    = texture(mid_t,   north     - uv_mid);
+    vec4 mid_ne   = texture(mid_t,   northeast - uv_mid);
+    vec4 mid_w    = texture(mid_t,   west      - uv_mid);
+    vec4 mid_e    = texture(mid_t,   east      - uv_mid);
+    vec4 mid_sw   = texture(mid_t,   southwest - uv_mid);
+    vec4 mid_s    = texture(mid_t,   south     - uv_mid);
+    vec4 mid_se   = texture(mid_t,   southeast - uv_mid);
+    vec4 other    = texture(other_t, xy                );
+    vec4 other_nw = texture(other_t, northwest         );
+    vec4 other_n  = texture(other_t, north             );
+    vec4 other_ne = texture(other_t, northeast         );
+    vec4 other_sw = texture(other_t, southwest         );
+    vec4 other_s  = texture(other_t, south             );
+    vec4 other_se = texture(other_t, southeast         );
+    vec4 other_e  = texture(other_t, east              );
+    vec4 other_w  = texture(other_t, west              );
 
     // convection, low and high include uplift, mid is pure 2D
     low0_out  = low0  * clamp(1. + mid.w, 0., 1.) 
@@ -78,27 +102,48 @@ void main(){
     other_out = other;
 
     // calculate divergence
-    float div_low = low0_n.y - low0_s.y + low0_e.x - low0_w.x;
-    float div_high = high0_n.y - high0_s.y + high0_e.x - high0_w.x;
-
-    // calculate terrain gradient
-    vec2 terrain_gradient = vec2(
-        other_e.z - other_w.z,
-        other_n.z - other_s.z
+    float dX = 1. / sim_res.x;
+    float dY = 1. / sim_res.y;
+    float uplift_flux = 0.0625 * (
+               mid_nw.w + 2. * mid_n.w +      mid_ne.w
+        + 2. * mid_w.w  + 4. * mid.w   + 2. * mid_e.w
+        +      mid_sw.w + 2. * mid_s.w +      mid_se.w
     );
-    
-    // accumulate pressure
-    low1_out.p += -mid.w - div_low + dot(uv_low, terrain_gradient) * K_pressure_uplift_acc;
-    high1_out.p += mid.w - div_high;
+    float convergence_low = 0.125 * (
+        dY * (
+              (2. * low_elev - other_nw.z - other_nw.w - other_w.z - other_w.w) * (low0_nw.x + low0_w.x)
+            + (2. * low_elev - other_w.z - other_w.w - other_sw.z - other_sw.w) * (low0_w.x + low0_sw.x)
+            - (2. * low_elev - other_ne.z - other_ne.w - other_e.z - other_e.w) * (low0_ne.x + low0_e.x)
+            - (2. * low_elev - other_e.z - other_e.w - other_se.z - other_se.w) * (low0_e.x + low0_se.x)
+        ) + dX * (
+              (2. * low_elev - other_sw.z - other_sw.w - other_s.z - other_s.w) * (low0_sw.y + low0_s.y)
+            + (2. * low_elev - other_s.z - other_s.w - other_se.z - other_se.w) * (low0_s.y + low0_se.y)
+            - (2. * low_elev - other_nw.z - other_nw.w - other_n.z - other_n.w) * (low0_nw.y + low0_n.y)
+            - (2. * low_elev - other_n.z - other_n.w - other_ne.z - other_ne.w) * (low0_n.y + low0_ne.y)
+        )
+    );
+    float convergence_high = 0.25 * (high_elev - low_elev) * (
+        dY * (
+              high0_nw.x + 2. * high0_w.x + high0_sw.x
+            - high0_ne.x - 2. * high0_e.x - high0_se.x
+        ) + dX * (
+              high0_sw.y + 2. * high0_s.y + high0_se.y
+            - high0_nw.y - 2. * high0_n.y - high0_ne.y
+        )
+    );
     
     // smooth pressure
     // TODO: improve filtering, maybe larger window
-    low1_out.p = (low1_out.p + low1_n.p + low1_s.p + low1_e.p + low1_w.p) / 5.;
-    high1_out.p = (high1_out.p + high1_n.p + high1_s.p + high1_e.p + high1_w.p) / 5.;
+    low1_out.p = (low1_out.p + low1_n.p + low1_s.p + low1_e.p + low1_w.p) * 0.2;
+    high1_out.p = (high1_out.p + high1_n.p + high1_s.p + high1_e.p + high1_w.p) * 0.2;
     low1_out.p = (1. - K_uplift_damping) * low1_out.p + K_uplift_damping * high1_out.p;
     high1_out.p = (1. - K_uplift_damping) * high1_out.p + K_uplift_damping * low1_out.p;
     low1_out.p *= K_pressure_decay;
     high1_out.p *= K_pressure_decay;
+
+    // accumulate pressure
+    low1_out.p += convergence_low - uplift_flux;
+    high1_out.p += convergence_high + uplift_flux;
 
     // decend pressure
     low0_out.x += (low1_w.p - low1_e.p) * K_pressure;
