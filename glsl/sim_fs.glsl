@@ -104,31 +104,33 @@ void main(){
     // calculate divergence
     float dX = 1. / sim_res.x;
     float dY = 1. / sim_res.y;
-    float uplift_flux = 0.0625 * (
-               mid_nw.w + 2. * mid_n.w +      mid_ne.w
-        + 2. * mid_w.w  + 4. * mid.w   + 2. * mid_e.w
-        +      mid_sw.w + 2. * mid_s.w +      mid_se.w
-    );
-    float convergence_low = 0.125 * (
+    float uplift_flux = 0.015625 * (
+               mid_nw.w + 6.  * mid_n.w +      mid_ne.w
+        + 6. * mid_w.w  + 36. * mid.w   + 6. * mid_e.w
+        +      mid_sw.w + 6.  * mid_s.w +      mid_se.w
+    ) * dX * dY;
+
+    float convergence_low = 0.0078125 * (
         dY * (
-              (2. * low_elev - other_nw.z - other_nw.w - other_w.z - other_w.w) * (low0_nw.x + low0_w.x)
-            + (2. * low_elev - other_w.z - other_w.w - other_sw.z - other_sw.w) * (low0_w.x + low0_sw.x)
-            - (2. * low_elev - other_ne.z - other_ne.w - other_e.z - other_e.w) * (low0_ne.x + low0_e.x)
-            - (2. * low_elev - other_e.z - other_e.w - other_se.z - other_se.w) * (low0_e.x + low0_se.x)
+            - (8. * low_elev - 3. * other.z - 3. * other_e.z - other_n.z - other_ne.z) * (3. * low0.x + 3. * low0_e.x + low0_n.x + low0_ne.x)
+            - (8. * low_elev - 3. * other.z - 3. * other_e.z - other_s.z - other_se.z) * (3. * low0.x + 3. * low0_e.x + low0_s.x + low0_se.x)
+            + (8. * low_elev - 3. * other.z - 3. * other_w.z - other_n.z - other_nw.z) * (3. * low0.x + 3. * low0_w.x + low0_n.x + low0_nw.x)
+            + (8. * low_elev - 3. * other.z - 3. * other_w.z - other_s.z - other_sw.z) * (3. * low0.x + 3. * low0_w.x + low0_s.x + low0_sw.x)            
         ) + dX * (
-              (2. * low_elev - other_sw.z - other_sw.w - other_s.z - other_s.w) * (low0_sw.y + low0_s.y)
-            + (2. * low_elev - other_s.z - other_s.w - other_se.z - other_se.w) * (low0_s.y + low0_se.y)
-            - (2. * low_elev - other_nw.z - other_nw.w - other_n.z - other_n.w) * (low0_nw.y + low0_n.y)
-            - (2. * low_elev - other_n.z - other_n.w - other_ne.z - other_ne.w) * (low0_n.y + low0_ne.y)
+            - (8. * low_elev - 3. * other.z - 3. * other_n.z - other_e.z - other_ne.z) * (3. * low0.y + 3. * low0_n.y + low0_e.z + low0_ne.z)
+            - (8. * low_elev - 3. * other.z - 3. * other_n.z - other_w.z - other_nw.z) * (3. * low0.y + 3. * low0_n.y + low0_w.z + low0_nw.z)
+            + (8. * low_elev - 3. * other.z - 3. * other_s.z - other_e.z - other_se.z) * (3. * low0.y + 3. * low0_s.y + low0_e.z + low0_se.z)
+            + (8. * low_elev - 3. * other.z - 3. * other_s.z - other_w.z - other_sw.z) * (3. * low0.y + 3. * low0_s.y + low0_w.z + low0_sw.z)            
         )
     );
-    float convergence_high = 0.25 * (high_elev - low_elev) * (
+    
+    float convergence_high = 0.0625 * (high_elev - low_elev) * (
         dY * (
-              high0_nw.x + 2. * high0_w.x + high0_sw.x
-            - high0_ne.x - 2. * high0_e.x - high0_se.x
+              high0_nw.x + 6. * high0_w.x + high0_sw.x
+            - high0_ne.x - 6. * high0_e.x - high0_se.x
         ) + dX * (
-              high0_sw.y + 2. * high0_s.y + high0_se.y
-            - high0_nw.y - 2. * high0_n.y - high0_ne.y
+              high0_sw.y + 6. * high0_s.y + high0_se.y
+            - high0_nw.y - 6. * high0_n.y - high0_ne.y
         )
     );
     

@@ -26,7 +26,7 @@
                 "elevation",
                 "rain"
             ],
-            "default": "elevation"
+            "default": "all velocity"
         }
     },
     "pen_vel": {
@@ -52,7 +52,7 @@
                 "realistic",
                 "temp"
             ],
-            "default": "realistic"
+            "default": "both velocity"
         }
     },
     "cloud_mode": {
@@ -75,7 +75,7 @@
             "type": "range",
             "min": 0,
             "max": 0.2,
-            "default": 0.1
+            "default": 0.02
         }
     },
     "pen_strength": {
@@ -153,8 +153,8 @@
         "input": {
             "type": "range",
             "min": 0,
-            "max": 3000,
-            "default": 2700
+            "max": 1500,
+            "default": 675
         }
     },
     "K_pressure_uplift": {
@@ -162,8 +162,8 @@
         "input": {
             "type": "range",
             "min": 0,
-            "max": 10,
-            "default": 1
+            "max": 1500,
+            "default": 675
         }
     },
     "K_uplift_damping": {
