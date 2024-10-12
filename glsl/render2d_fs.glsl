@@ -105,6 +105,16 @@ void main(){
         temp = interp_elev(z_scale * other.z, other.t, low1.t, high1.t, 0.);
         frag_color = heatmap(temp);
         break;
+    case 7:  // low pressure
+        low1 = texture(low1_t, xy);
+        pressure = 10000. * low1.p;
+        frag_color = vec4(pressure, 0., -pressure, 1.);
+        break;
+    case 8:  // high pressure
+        high1 = texture(high1_t, xy);
+        pressure = 10000. * high1.p;
+        frag_color = vec4(pressure, 0., -pressure, 1.);
+        break;
     }
     if (abs(length(cursor_pos - xy) - pen_size) < 0.001){
         frag_color = vec4(1.);

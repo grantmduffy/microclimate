@@ -21,7 +21,7 @@ Uplift           | U  |  mid.w
 Sediment         | s  |  other.s
 Surface Temp     | T  |  other.t
 Elevation        | z  |  other.z
-Water            | w  |  other.w
+Water Depth      | w  |  other.w
 Surface Light    | g  |  light.x
 Low Cloud Light  | l  |  light.y
 High Cloud Light | h  |  light.z

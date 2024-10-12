@@ -50,7 +50,9 @@
                 "elevation",
                 "clouds",
                 "realistic",
-                "temp"
+                "temp",
+                "low pressure",
+                "high pressure"
             ],
             "default": "both velocity"
         }
