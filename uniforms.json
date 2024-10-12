@@ -64,9 +64,10 @@
                 "uplift",
                 "pressure",
                 "realistic",
-                "temp"
+                "temp",
+                "none"
             ],
-            "default": "realistic"
+            "default": "none"
         }
     },
     "pen_size": {

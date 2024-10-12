@@ -66,7 +66,7 @@ void main(){
         high1 = texture(high1_t, xy);
         mid = texture(mid_t, xy);
         pressure = 0.5 * (low1.p + high1.p) * 10. * K_pressure;
-        uplift = 100. * mid.w;
+        uplift = 10. * mid.w;
         frag_color = vec4(uplift, pressure, -uplift, 1.);
         break;
     case 3:  // elevation

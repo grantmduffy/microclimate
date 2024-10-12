@@ -705,15 +705,17 @@ function init(){
 
 
             // draw plane clouds
-            gl.useProgram(data.programs.cloud_plane.program);
-            gl.bindBuffer(gl.ARRAY_BUFFER, data.buffers.cloud_planes_buffer);
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
-            gl.vertexAttribPointer(
-                data.programs.cloud_plane.pos_attr_loc, 3,
-                gl.FLOAT, gl.FALSE,
-                3 * 4, 0
-            );
-            gl.drawArrays(gl.TRIANGLES, 0, 3 * cloud_planes.length);
+            if (cloud_mode_options[data.uniforms.cloud_mode.value] != 'none'){
+                gl.useProgram(data.programs.cloud_plane.program);
+                gl.bindBuffer(gl.ARRAY_BUFFER, data.buffers.cloud_planes_buffer);
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+                gl.vertexAttribPointer(
+                    data.programs.cloud_plane.pos_attr_loc, 3,
+                    gl.FLOAT, gl.FALSE,
+                    3 * 4, 0
+                );
+                gl.drawArrays(gl.TRIANGLES, 0, 3 * cloud_planes.length);    
+            }
         } else if (render_mode_el.value == 'sun'){
             
 
