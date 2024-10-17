@@ -5,23 +5,23 @@ value  | x | y | z | w |
        | r | g | b | a |
        | s | t | p | a | loc |
 -------|---|---|---|---|-----|
-low0   | u | v | - | - |  0  |
-low1   | - | T | P | H |  1  |
-high2  | u | v | - | - |  2  |
-high3  | - | T | P | H |  3  |
-mid    | r | r | - | U |  4  |
-other  | s | T | z | w |  5  |
-light  | g | l | h | d |  6  |
+atm0   | u | v | z | - |  0  |
+atm1   | - | T | - | H |  1  |
+water0 | u | v | w | - |  2  |
+water1 | s | T | - | - |  3  |
+ground | - | T | z | - |  4  |
+light  | g | l | h | d |  5  |
 
-Velocity         | uv |  low0/high0.xy
-Temperature      | T  |  low1/high1.t
-Humidity         | H  |  low1/high1.a
-Pressure         | P  |  low1/high1.p
-Uplift           | U  |  mid.w
-Sediment         | s  |  other.s
-Surface Temp     | T  |  other.t
-Elevation        | z  |  other.z
-Water Depth      | w  |  other.w
+Air Velocity     | uv |  atm0.xy
+Atm Thickness    | Za |  atm0.z
+Air Temperature  | T  |  atm1.t
+Air Humidity     | H  |  atm1.a
+Water Velocity   | uv |  water0.xy
+Water Depth      | w  |  water0.z
+Water Sediment   | s  |  water1.s
+Water Temp       | T  |  water1.t
+Elevation        | z  |  ground.z
+Surface Temp     | T  |  ground.t
 Surface Light    | g  |  light.x
 Low Cloud Light  | l  |  light.y
 High Cloud Light | h  |  light.z
@@ -812,14 +812,14 @@ function init(){
         // textures
         let sim_fbo = gl.createFramebuffer();
         let sim_depthbuffer = gl.createRenderbuffer();
-        let tex_names = ['low0_t', 'low1_t', 'high0_t', 'high1_t', 'mid_t', 'other_t'];
+        let tex_names = ['atm0_t', 'atm1_t', 'water0_t', 'water1_t', 'ground_t'];
         let tex_defaults = [
-            [0, 0, 0, 0],  // low0 wind [0.3, 0.3] 
-            [0, 1, 0, 0],    // low1 surface temp 1
-            [0, 0, 0, 0],  // high0
-            [0, 0.5, 0, 0],  // high1
-            [0, 1, 0, 0],    // other temp 1
-            [0, 0, 0, 0]     // light
+            [0, 0, 1.0, 0],  // atm0: atm thickness of 1.0
+            [0, 0, 0, 0],    // atm1: no temp or humidity
+            [0, 0, 0, 0],    // water0: no water
+            [0, 0, 0, 0],    // water1: no water
+            [0, 0, 0, 0],    // ground: no terrain
+            // [0, 0, 0, 0]     // light: no light
         ];
         data.textures = [];
         for (var i = 0; i < tex_names.length; i++){
@@ -874,7 +874,7 @@ function init(){
             gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
             gl.TEXTURE_2D, sun_tex, 0
         );
-        gl.activeTexture(gl.TEXTURE0 + 6);
+        gl.activeTexture(gl.TEXTURE0 + 5);
         gl.bindTexture(gl.TEXTURE_2D, sun_tex);
 
         data.fbos = {

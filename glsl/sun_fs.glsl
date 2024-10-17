@@ -1,8 +1,6 @@
 
-uniform sampler2D low1_t;
-uniform sampler2D high1_t;
-uniform sampler2D other_t;
-uniform sampler2D mid_t;
+uniform sampler2D atm1_t;
+uniform sampler2D ground_t;
 uniform vec3 sun_dir;
 uniform mat4 M_sun;
 
@@ -22,11 +20,12 @@ void main(){
     for (int i = n_light_samples; i > 0; i--){
         float z_sample = xyz.z + (max_elev - xyz.z) * float(i) / float(n_light_samples);
         vec2 xy_sample = xyz.xy + 0.5 * (z_sample - xyz.z) * sun_dir.xy / sun_dir.z;
-        float low_cloud = texture(low1_t, xy_sample).a;
-        float high_cloud = texture(high1_t, xy_sample).a;
-        float ground_temp = texture(other_t, xyz.xy).t;
-        float low_temp = texture(low1_t, xyz.xy + 0.5 * (z_sample - xyz.z) * sun_dir.xy / sun_dir.z).t;
-        float high_temp = texture(high1_t, xy_sample).t;
+        vec4 atm1 = texture(atm1_t, xy_sample).a;
+        float low_cloud = atm1;
+        float high_cloud = 0.;
+        float ground_temp = texture(ground_t, xyz.xy).t;
+        float low_temp = atm1.t;
+        float high_temp = 0.;
         float temp = interp_elev(z_sample, ground_temp, low_temp, high_temp, 0.);
         float cloud = get_cloud_density(interp_elev(
             z_sample, 0., low_cloud, high_cloud, 0.

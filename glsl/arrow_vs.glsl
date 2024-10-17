@@ -1,4 +1,5 @@
 
+// TODO: update textures
 uniform sampler2D low0_t;
 uniform sampler2D high0_t;
 

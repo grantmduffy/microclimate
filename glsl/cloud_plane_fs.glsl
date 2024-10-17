@@ -1,10 +1,9 @@
 
-uniform sampler2D low0_t;
-uniform sampler2D low1_t;
-uniform sampler2D high0_t;
-uniform sampler2D high1_t;
-uniform sampler2D mid_t;
-uniform sampler2D other_t;
+uniform sampler2D atm0_t;
+uniform sampler2D atm1_t;
+uniform sampler2D water0_t;
+uniform sampler2D water1_t;
+uniform sampler2D ground_t;
 uniform sampler2D light_t;
 uniform int cloud_mode;
 uniform float cloud_density;
@@ -31,10 +30,9 @@ void main(){
         ){
         discard;
     }
-    float ground_temp = texture(other_t, xyz.xy).t;
-    float low_temp = texture(low1_t, xyz.xy).t;
-    float high_temp = texture(high1_t, xyz.xy).t;
-    float temp = interp_elev(xyz.z, ground_temp, low_temp, high_temp, 0.);
+    float ground_temp = texture(ground_t, xyz.xy).t;
+    float air_temp = texture(atm1_t, xyz.xy).t;
+    float temp = interp_elev(xyz.z, ground_temp, ait_temp, 0., 0.);
     switch (cloud_mode){
         case 0:  // velocity
 
@@ -50,12 +48,12 @@ void main(){
                 (xyz.z - light.y) * (1. - light.x) / (light.z - light.y) + light.x, 
                 light.x, 1.
             );
-            float low_cloud = texture(low1_t, xyz.xy + rand2d(sun_coord.xy) / sim_res).a;
-            float high_cloud = texture(high1_t, xyz.xy + rand2d(sun_coord.xy) / sim_res).a;
+            float low_cloud = texture(atm1_t, xyz.xy + rand2d(sun_coord.xy) / sim_res).a;
+            float high_cloud = 0.0;
             float cloud = get_cloud_density(interp_elev(
                 xyz.z, 0., low_cloud, high_cloud, 0.
             ), temp);
-            vec2 precip = texture(mid_t, xyz.xy).xy;
+            vec2 precip = vec2(0., 0.);
             precip.x += precip.y;
             float rain = clamp(rain_density * interp_rain(xyz.z, precip.x, precip.x, precip.y, 0.), 0., 1.);
             float cos_angle = dot(sun_dir, normalize(camera_pos - xyz.xyz));
